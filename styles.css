@@ -9,6 +9,7 @@
   --rose: #c98f84;
   --clay: #a56f50;
   --gold: #b78a32;
+  --heading: #614a37;
   --shadow: 0 20px 60px rgba(45, 34, 25, 0.13);
 }
 
@@ -219,6 +220,7 @@ textarea {
 h1,
 h2,
 h3 {
+  color: var(--heading);
   font-family: "Noto Serif JP", serif;
   letter-spacing: 0;
   line-height: 1.22;
