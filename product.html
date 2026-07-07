@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>商品を選ぶ | andtete</title>
+    <meta name="description" content="andteteの商品カラーと追加オプションを選ぶページです。" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="notice">カラーとオプションを選んで、Stripeの安全な決済画面へ進めます</div>
+    <header class="site-header" aria-label="サイトヘッダー">
+      <a class="brand" href="./index.html" aria-label="andtete ホーム">
+        <span class="brand-mark">andtete</span>
+      </a>
+      <nav class="nav" aria-label="メインメニュー">
+        <a href="./index.html#new-arrivals">NEW ARRIVALS</a>
+        <a href="./index.html#recommend">おすすめ</a>
+        <a href="./index.html#all-products">商品一覧</a>
+      </nav>
+      <a class="icon-button text-icon" href="./index.html" aria-label="商品一覧へ戻る">戻る</a>
+    </header>
+
+    <main class="purchase-page">
+      <div id="purchaseProduct" aria-live="polite">
+        <p class="empty-message">商品を読み込んでいます。</p>
+      </div>
+    </main>
+
+    <footer class="site-footer">
+      <p>andtete</p>
+      <small>handmade goods for family days</small>
+    </footer>
+
+    <script src="./site-config.js"></script>
+    <script src="./data/products.js"></script>
+    <script src="./product.js"></script>
+  </body>
+</html>
