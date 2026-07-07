@@ -118,6 +118,29 @@ let activeListCategory = "new";
 let activeGridSize = localStorage.getItem("andteteListGridSize") || "3";
 const productsStorageKey = "andteteProductsPreview";
 const sheetUrlStorageKey = "andteteSheetWebhookUrl";
+const customCategoriesStorageKey = "andteteCustomCategories";
+let customerCustomCategories = [];
+
+function normalizeCustomerCategories(categories) {
+  return Array.isArray(categories)
+    ? categories.filter((category) => category && String(category.key || "").startsWith("custom-") && String(category.label || "").trim())
+    : [];
+}
+
+function renderCustomerCategoryTabs(categories = customerCustomCategories) {
+  customerCustomCategories = normalizeCustomerCategories(categories);
+  const container = document.querySelector("#customerCategoryTabs");
+  if (!container) return;
+  const tabs = [
+    { key: "new", label: "NEW ARRIVALS" },
+    { key: "recommend", label: "おすすめ" },
+    ...customerCustomCategories,
+  ];
+  if (!tabs.some((tab) => tab.key === activeListCategory)) activeListCategory = "new";
+  container.innerHTML = tabs
+    .map((tab) => `<button class="${tab.key === activeListCategory ? "active" : ""}" type="button" data-list-tab="${escapeHtml(tab.key)}" role="tab" aria-selected="${tab.key === activeListCategory}">${escapeHtml(tab.label)}</button>`)
+    .join("");
+}
 
 function sheetDataUrl() {
   return String(window.ANDTETE_CONFIG?.sheetWebAppUrl || localStorage.getItem(sheetUrlStorageKey) || "").trim();
@@ -140,11 +163,12 @@ function loadRemoteProducts(url) {
 
     window[callbackName] = (payload) => {
       const products = Array.isArray(payload) ? payload : payload?.products;
+      const categories = Array.isArray(payload?.categories) ? payload.categories : [];
       if (!Array.isArray(products)) {
         finish(new Error("商品データの形式が正しくありません。"));
         return;
       }
-      finish(null, products);
+      finish(null, { products, categories });
     };
 
     script.onerror = () => finish(new Error("商品データを取得できませんでした。"));
@@ -153,8 +177,9 @@ function loadRemoteProducts(url) {
   });
 }
 
-function renderProducts(products) {
+function renderProducts(products, categories = customerCustomCategories) {
   allProductsCache = products;
+  renderCustomerCategoryTabs(categories);
   document.querySelectorAll("[data-products]").forEach((container) => {
     const category = container.dataset.products;
     const items = products.filter((product) => product.visible !== false && product.categories?.includes(category));
@@ -300,9 +325,9 @@ async function loadProducts() {
   const remoteUrl = sheetDataUrl();
   if (remoteUrl.startsWith("https://script.google.com/")) {
     try {
-      const remoteProducts = await loadRemoteProducts(remoteUrl);
-      if (remoteProducts.length) {
-        renderProducts(remoteProducts);
+      const remoteData = await loadRemoteProducts(remoteUrl);
+      if (remoteData.products.length) {
+        renderProducts(remoteData.products, remoteData.categories);
         setupSliders();
         return;
       }
@@ -312,8 +337,9 @@ async function loadProducts() {
   }
 
   const previewProducts = localStorage.getItem(productsStorageKey);
+  const previewCategories = normalizeCustomerCategories(JSON.parse(localStorage.getItem(customCategoriesStorageKey) || "[]"));
   if (previewProducts) {
-    renderProducts(JSON.parse(previewProducts));
+    renderProducts(JSON.parse(previewProducts), previewCategories);
     setupSliders();
     return;
   }
@@ -322,11 +348,11 @@ async function loadProducts() {
     const response = await fetch("./data/products.json", { cache: "no-store" });
     if (!response.ok) throw new Error("商品データを読み込めませんでした。");
     const products = await response.json();
-    renderProducts(products);
+    renderProducts(products, previewCategories);
     setupSliders();
   } catch (error) {
     if (Array.isArray(window.ANDTETE_PRODUCTS)) {
-      renderProducts(window.ANDTETE_PRODUCTS);
+      renderProducts(window.ANDTETE_PRODUCTS, previewCategories);
       setupSliders();
       return;
     }
@@ -341,9 +367,19 @@ async function loadProducts() {
 loadProducts();
 
 window.addEventListener("storage", (event) => {
+  if (event.key === customCategoriesStorageKey && event.newValue) {
+    try {
+      renderCustomerCategoryTabs(JSON.parse(event.newValue));
+      renderListProducts(activeListCategory);
+    } catch (error) {
+      console.warn("更新された商品タブを読み込めませんでした。", error);
+    }
+    return;
+  }
   if (event.key !== productsStorageKey || !event.newValue) return;
   try {
-    renderProducts(JSON.parse(event.newValue));
+    const categories = JSON.parse(localStorage.getItem(customCategoriesStorageKey) || "[]");
+    renderProducts(JSON.parse(event.newValue), categories);
   } catch (error) {
     console.warn("更新された商品データを読み込めませんでした。", error);
   }
@@ -353,7 +389,8 @@ window.addEventListener("focus", () => {
   const previewProducts = localStorage.getItem(productsStorageKey);
   if (!previewProducts) return;
   try {
-    renderProducts(JSON.parse(previewProducts));
+    const categories = JSON.parse(localStorage.getItem(customCategoriesStorageKey) || "[]");
+    renderProducts(JSON.parse(previewProducts), categories);
   } catch (error) {
     console.warn("商品データを再読み込みできませんでした。", error);
   }
@@ -364,8 +401,8 @@ window.setInterval(async () => {
   const remoteUrl = sheetDataUrl();
   if (!remoteUrl.startsWith("https://script.google.com/")) return;
   try {
-    const products = await loadRemoteProducts(remoteUrl);
-    if (products.length) renderProducts(products);
+    const data = await loadRemoteProducts(remoteUrl);
+    if (data.products.length) renderProducts(data.products, data.categories);
   } catch (error) {
     console.warn("商品の自動更新を次回再試行します。", error);
   }

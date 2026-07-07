@@ -20,9 +20,18 @@
     <div class="notice">TikTokライブ販売 月・水・金 21:30 START / Stripe決済対応</div>
 
     <header class="site-header" aria-label="サイトヘッダー">
-      <a class="brand" href="./index.html" aria-label="andtete ホーム">
-        <span class="brand-mark">andtete</span>
-      </a>
+      <div class="brand-group">
+        <a class="brand" href="./index.html" aria-label="andtete ホーム">
+          <span class="brand-mark">andtete</span>
+        </a>
+        <a class="icon-button brand-social-icon" href="https://www.instagram.com/and_tete?igsh=anhiMGZmOWlwaW5s&utm_source=qr" target="_blank" rel="noreferrer" aria-label="Instagramを見る">
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect width="18" height="18" x="3" y="3" rx="5" />
+            <circle cx="12" cy="12" r="4" />
+            <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" />
+          </svg>
+        </a>
+      </div>
       <nav class="nav" aria-label="メインメニュー">
         <a href="#new-arrivals">NEW ARRIVALS</a>
         <a href="#recommend">おすすめ</a>
@@ -117,7 +126,7 @@
             <span class="eyebrow">一覧で探す</span>
             <h2 id="all-products-title">商品一覧</h2>
           </div>
-          <div class="list-tabs" role="tablist" aria-label="商品一覧の切り替え">
+          <div class="list-tabs customer-category-tabs" id="customerCategoryTabs" role="tablist" aria-label="商品一覧の切り替え">
             <button class="active" type="button" data-list-tab="new" role="tab" aria-selected="true">NEW ARRIVALS</button>
             <button type="button" data-list-tab="recommend" role="tab" aria-selected="false">おすすめ</button>
           </div>

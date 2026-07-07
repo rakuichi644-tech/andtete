@@ -103,10 +103,7 @@
 
           <fieldset class="span-2 easy-fieldset">
             <legend>どこに掲載する？</legend>
-            <label><input type="checkbox" name="category" value="new" checked /> NEW ARRIVALS</label>
-            <label><input type="checkbox" name="category" value="recommend" /> おすすめ</label>
-            <label><input type="checkbox" name="category" value="preorder" /> 予約商品</label>
-            <label><input type="checkbox" name="category" value="stock" /> 即納商品</label>
+            <div class="category-checks" id="categoryChecks"></div>
           </fieldset>
 
           <label class="easy-toggle span-2">
@@ -122,6 +119,21 @@
         <p class="admin-status" id="adminStatus" aria-live="polite"></p>
       </section>
 
+      <section class="admin-panel" aria-labelledby="category-manager-title">
+        <div class="admin-panel-head">
+          <div>
+            <span class="eyebrow">custom tabs</span>
+            <h2 id="category-manager-title">商品タブを追加</h2>
+          </div>
+        </div>
+        <p>「季節商品」「ギフト」など、お客様がHPで選べる商品タブを自由に追加できます。</p>
+        <div class="category-manager-form">
+          <input id="newCategoryName" placeholder="例: 季節商品" />
+          <button class="primary-link" type="button" id="addCategory">タブを追加</button>
+        </div>
+        <div class="custom-category-list" id="customCategoryList"></div>
+      </section>
+
       <section class="admin-panel" aria-labelledby="list-title">
         <div class="admin-panel-head">
           <div>
@@ -134,7 +146,12 @@
             <button class="primary-link soft-button" type="button" id="resetProducts">初期データに戻す</button>
           </div>
         </div>
+        <div class="admin-product-tools">
+          <div class="list-tabs admin-filter-tabs" id="adminFilterTabs" role="tablist" aria-label="登録商品の絞り込み"></div>
+          <span id="adminProductCount" class="admin-product-count"></span>
+        </div>
         <div class="easy-product-list" id="productList"></div>
+        <nav class="admin-pagination" id="adminPagination" aria-label="登録商品のページ切り替え"></nav>
       </section>
 
       <section class="admin-panel publish-panel" aria-labelledby="publish-title">

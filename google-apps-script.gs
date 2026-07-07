@@ -11,10 +11,11 @@ function doPost(e) {
   try {
     const payload = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     const products = Array.isArray(payload.products) ? payload.products : [];
+    const categories = Array.isArray(payload.categories) ? payload.categories : [];
     const publishedProducts = saveUploadedImages_(products);
 
     writeInventorySheet_(publishedProducts);
-    writeProductData_(publishedProducts);
+    writeProductData_({ products: publishedProducts, categories: categories });
 
     return jsonOutput_({ ok: true, count: publishedProducts.length, updatedAt: new Date().toISOString() });
   } catch (error) {
@@ -25,10 +26,11 @@ function doPost(e) {
 }
 
 function doGet(e) {
-  const products = readProductData_();
+  const data = readProductData_();
   const payload = JSON.stringify({
     ok: true,
-    products: products,
+    products: data.products,
+    categories: data.categories,
     updatedAt: new Date().toISOString()
   });
   const callback = e && e.parameter ? String(e.parameter.callback || '') : '';
@@ -95,10 +97,10 @@ function writeInventorySheet_(products) {
   sheet.autoResizeColumns(1, headers.length);
 }
 
-function writeProductData_(products) {
+function writeProductData_(data) {
   const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = spreadsheet.getSheetByName(DATA_SHEET_NAME) || spreadsheet.insertSheet(DATA_SHEET_NAME);
-  const json = JSON.stringify(products);
+  const json = JSON.stringify(data);
   const chunks = [];
 
   for (let index = 0; index < json.length; index += JSON_CHUNK_SIZE) {
@@ -113,14 +115,19 @@ function writeProductData_(products) {
 function readProductData_() {
   const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = spreadsheet.getSheetByName(DATA_SHEET_NAME);
-  if (!sheet || sheet.getLastRow() < 1) return [];
+  if (!sheet || sheet.getLastRow() < 1) return { products: [], categories: [] };
 
   const json = sheet.getRange(1, 1, sheet.getLastRow(), 1).getValues()
     .map(function(row) { return String(row[0] || ''); })
     .join('');
 
-  if (!json) return [];
-  return JSON.parse(json);
+  if (!json) return { products: [], categories: [] };
+  const parsed = JSON.parse(json);
+  if (Array.isArray(parsed)) return { products: parsed, categories: [] };
+  return {
+    products: Array.isArray(parsed.products) ? parsed.products : [],
+    categories: Array.isArray(parsed.categories) ? parsed.categories : []
+  };
 }
 
 function saveUploadedImages_(products) {

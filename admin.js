@@ -17,6 +17,7 @@ const imageNames = {
 
 const storageKey = "andteteProductsPreview";
 const sheetUrlKey = "andteteSheetWebhookUrl";
+const customCategoryStorageKey = "andteteCustomCategories";
 const defaultImage = "./assets/item-green-bag.png";
 const form = document.querySelector("#productForm");
 const productList = document.querySelector("#productList");
@@ -30,13 +31,22 @@ const imagePreset = document.querySelector("#imagePreset");
 const imageThumbs = document.querySelector("#imageThumbs");
 const variantList = document.querySelector("#variantList");
 const optionList = document.querySelector("#optionList");
+const categoryChecks = document.querySelector("#categoryChecks");
+const customCategoryList = document.querySelector("#customCategoryList");
+const adminFilterTabs = document.querySelector("#adminFilterTabs");
+const adminPagination = document.querySelector("#adminPagination");
+const adminProductCount = document.querySelector("#adminProductCount");
 const maxImages = 7;
+const adminPageSize = 10;
 
 let products = [];
 let editingId = "";
 let currentImages = [defaultImage];
 let currentVariants = [];
 let currentOptions = [];
+let customCategories = [];
+let activeAdminFilter = "all";
+let activeAdminPage = 1;
 
 function uid() {
   return `item-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
@@ -67,6 +77,47 @@ function savePreview() {
   }
 }
 
+function normalizeCustomCategories(categories) {
+  return Array.isArray(categories)
+    ? categories
+        .filter((category) => category && String(category.key || "").startsWith("custom-") && String(category.label || "").trim())
+        .map((category) => ({ key: String(category.key), label: String(category.label).trim() }))
+    : [];
+}
+
+function updateCategoryNames() {
+  Object.keys(categoryNames).forEach((key) => {
+    if (key.startsWith("custom-")) delete categoryNames[key];
+  });
+  customCategories.forEach((category) => {
+    categoryNames[category.key] = category.label;
+  });
+}
+
+function saveCustomCategories() {
+  localStorage.setItem(customCategoryStorageKey, JSON.stringify(customCategories));
+  updateCategoryNames();
+}
+
+function renderCategoryChecks(selectedCategories = getCategories()) {
+  categoryChecks.innerHTML = Object.entries(categoryNames)
+    .map(([key, label]) => `<label><input type="checkbox" name="category" value="${escapeHtml(key)}" ${selectedCategories.includes(key) ? "checked" : ""} /> ${escapeHtml(label)}</label>`)
+    .join("");
+}
+
+function renderCustomCategoryList() {
+  customCategoryList.innerHTML = customCategories.length
+    ? customCategories.map((category) => `<span class="custom-category-chip">${escapeHtml(category.label)}<button type="button" data-delete-category="${escapeHtml(category.key)}" aria-label="${escapeHtml(category.label)}を削除">×</button></span>`).join("")
+    : `<span class="empty-message">追加したタブはありません。</span>`;
+}
+
+function renderAdminFilterTabs() {
+  const tabs = [["all", "すべて"], ...Object.entries(categoryNames)];
+  adminFilterTabs.innerHTML = tabs
+    .map(([key, label]) => `<button class="${activeAdminFilter === key ? "active" : ""}" type="button" data-admin-filter="${escapeHtml(key)}" aria-selected="${activeAdminFilter === key}">${escapeHtml(label)}</button>`)
+    .join("");
+}
+
 function getCategories() {
   return [...form.querySelectorAll("[name='category']:checked")].map((input) => input.value);
 }
@@ -85,6 +136,7 @@ function clearForm() {
   setOptions([]);
   document.querySelector("#stock").value = 1;
   document.querySelector("#visible").checked = true;
+  renderCategoryChecks([]);
   setCategories(["new"]);
   document.querySelector("#saveProduct").textContent = "この商品を保存";
 }
@@ -272,9 +324,20 @@ function fillForm(product) {
 }
 
 function renderList() {
-  productList.innerHTML = products
+  const filteredProducts = activeAdminFilter === "all"
+    ? products
+    : products.filter((product) => product.categories?.includes(activeAdminFilter));
+  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / adminPageSize));
+  activeAdminPage = Math.min(activeAdminPage, totalPages);
+  const pageStart = (activeAdminPage - 1) * adminPageSize;
+  const pageProducts = filteredProducts.slice(pageStart, pageStart + adminPageSize);
+
+  renderAdminFilterTabs();
+  adminProductCount.textContent = `${filteredProducts.length}商品・${activeAdminPage}/${totalPages}ページ`;
+
+  productList.innerHTML = pageProducts
     .map((product) => {
-      const places = (product.categories || []).map((category) => categoryNames[category]).join(" / ");
+      const places = (product.categories || []).map((category) => categoryNames[category] || category).join(" / ");
       const status = product.visible === false ? "非表示" : "表示中";
       const images = normalizeImages(product);
       return `
@@ -296,7 +359,15 @@ function renderList() {
         </article>
       `;
     })
-    .join("");
+    .join("") || `<p class="empty-message">このタブに登録中の商品はありません。</p>`;
+
+  adminPagination.innerHTML = totalPages > 1
+    ? `${activeAdminPage > 1 ? `<button type="button" data-admin-page="${activeAdminPage - 1}">前へ</button>` : ""}
+      ${Array.from({ length: totalPages }, (_, index) => index + 1)
+        .map((page) => `<button class="${page === activeAdminPage ? "active" : ""}" type="button" data-admin-page="${page}" aria-current="${page === activeAdminPage ? "page" : "false"}">${page}</button>`)
+        .join("")}
+      ${activeAdminPage < totalPages ? `<button type="button" data-admin-page="${activeAdminPage + 1}">次へ</button>` : ""}`
+    : "";
 }
 
 function normalizeProduct(product) {
@@ -406,7 +477,7 @@ async function sendToSheet(silent = false, successText = "スプシとHPへ同�
       method: "POST",
       mode: "no-cors",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ products }),
+      body: JSON.stringify({ products, categories: customCategories }),
     });
     message(successText);
     return true;
@@ -539,6 +610,65 @@ document.querySelector("#addOption").addEventListener("click", () => {
   rows[rows.length - 1]?.querySelector("[data-option-field='name']")?.focus();
 });
 
+document.querySelector("#addCategory").addEventListener("click", async () => {
+  const input = document.querySelector("#newCategoryName");
+  const label = input.value.trim();
+  if (!label) {
+    message("追加するタブ名を入力してください。");
+    return;
+  }
+  if (Object.values(categoryNames).some((name) => name.toLowerCase() === label.toLowerCase())) {
+    message("同じ名前のタブがすでにあります。");
+    return;
+  }
+
+  const selectedCategories = getCategories();
+  customCategories.push({ key: `custom-${Date.now()}`, label });
+  saveCustomCategories();
+  renderCategoryChecks(selectedCategories);
+  renderCustomCategoryList();
+  activeAdminPage = 1;
+  renderList();
+  input.value = "";
+  await syncAfterChange(`「${label}」タブを追加しました。`);
+});
+
+customCategoryList.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-delete-category]");
+  if (!button) return;
+  const key = button.dataset.deleteCategory;
+  const category = customCategories.find((item) => item.key === key);
+  customCategories = customCategories.filter((item) => item.key !== key);
+  products = products.map((product) => ({
+    ...product,
+    categories: (product.categories || []).filter((categoryKey) => categoryKey !== key),
+  }));
+  saveCustomCategories();
+  savePreview();
+  if (activeAdminFilter === key) activeAdminFilter = "all";
+  activeAdminPage = 1;
+  renderCategoryChecks(getCategories().filter((categoryKey) => categoryKey !== key));
+  renderCustomCategoryList();
+  renderList();
+  await syncAfterChange(`「${category?.label || "追加タブ"}」を削除しました。`);
+});
+
+adminFilterTabs.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-admin-filter]");
+  if (!button) return;
+  activeAdminFilter = button.dataset.adminFilter;
+  activeAdminPage = 1;
+  renderList();
+});
+
+adminPagination.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-admin-page]");
+  if (!button) return;
+  activeAdminPage = Number(button.dataset.adminPage || 1);
+  renderList();
+  document.querySelector("#list-title")?.scrollIntoView({ behavior: "smooth", block: "start" });
+});
+
 optionList.addEventListener("click", (event) => {
   const button = event.target.closest("[data-remove-option]");
   if (!button) return;
@@ -566,6 +696,7 @@ document.querySelector("#addTestProduct").addEventListener("click", async () => 
     categories: ["new", "recommend"],
   });
   savePreview();
+  activeAdminPage = Math.max(1, Math.ceil(products.length / adminPageSize));
   renderList();
   await syncAfterChange("テスト商品を追加しました。");
 });
@@ -602,6 +733,10 @@ productList.addEventListener("click", async (event) => {
   }
 });
 
+customCategories = normalizeCustomCategories(JSON.parse(localStorage.getItem(customCategoryStorageKey) || "[]"));
+updateCategoryNames();
+renderCategoryChecks([]);
+renderCustomCategoryList();
 clearForm();
 sheetWebhookUrl.value = localStorage.getItem(sheetUrlKey) || window.ANDTETE_CONFIG?.sheetWebAppUrl || "";
 loadProducts();
