@@ -177,10 +177,13 @@
           <li>Googleスプレッドシートを1つ作る</li>
           <li>「拡張機能」→「Apps Script」を開き、下の貼り付け用コードを入れる</li>
           <li>「デプロイ」→「新しいデプロイ」→「ウェブアプリ」、アクセスできるユーザーを「全員」にする</li>
-          <li>発行されたURLを下に入れて「連携URLを保存」を押す</li>
+          <li>発行されたURLと「設定」シートの管理用同期キーを下に入れて保存する</li>
         </ol>
         <label class="admin-output">スプシ連携URL
           <input id="sheetWebhookUrl" placeholder="https://script.google.com/macros/s/..." />
+        </label>
+        <label class="admin-output">管理用同期キー
+          <input id="sheetSyncToken" type="password" autocomplete="off" placeholder="設定シートに表示されるキー" />
         </label>
         <div class="easy-actions">
           <button class="primary-link" type="button" id="saveSheetUrl">連携URLを保存</button>
