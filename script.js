@@ -134,6 +134,8 @@ function renderCustomerCategoryTabs(categories = customerCustomCategories) {
   const tabs = [
     { key: "new", label: "NEW ARRIVALS" },
     { key: "recommend", label: "おすすめ" },
+    { key: "preorder", label: "予約商品" },
+    { key: "stock", label: "即納商品" },
     ...customerCustomCategories,
   ];
   if (!tabs.some((tab) => tab.key === activeListCategory)) activeListCategory = "new";
@@ -263,6 +265,13 @@ document.addEventListener("change", (event) => {
   if (purchaseSlot) purchaseSlot.innerHTML = purchaseMarkup(card?.dataset.productId || "", stock);
   if (variantImage && image) image.src = variantImage;
 });
+
+document.addEventListener("error", (event) => {
+  const image = event.target.closest?.(".product-main-image, .product-thumbs img");
+  if (!image || image.dataset.fallbackApplied) return;
+  image.dataset.fallbackApplied = "true";
+  image.src = "./assets/hero-handmade.png";
+}, true);
 
 function setupSliders() {
   const sliders = new Map(

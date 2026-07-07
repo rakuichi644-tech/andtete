@@ -386,8 +386,80 @@ function normalizeProduct(product) {
   };
 }
 
+function adminSheetDataUrl() {
+  return String(sheetWebhookUrl.value || window.ANDTETE_CONFIG?.sheetWebAppUrl || localStorage.getItem(sheetUrlKey) || "").trim();
+}
+
+function loadRemoteProductData(url) {
+  return new Promise((resolve, reject) => {
+    const callbackName = `andteteAdminCallback_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+    const script = document.createElement("script");
+    const separator = url.includes("?") ? "&" : "?";
+    const timeout = window.setTimeout(() => finish(new Error("商品データの取得がタイムアウトしました。")), 12000);
+
+    function finish(error, data) {
+      window.clearTimeout(timeout);
+      script.remove();
+      delete window[callbackName];
+      if (error) reject(error);
+      else resolve(data);
+    }
+
+    window[callbackName] = (payload) => {
+      const remoteProducts = Array.isArray(payload) ? payload : payload?.products;
+      if (!Array.isArray(remoteProducts)) {
+        finish(new Error("商品データの形式が正しくありません。"));
+        return;
+      }
+      finish(null, {
+        products: remoteProducts,
+        categories: Array.isArray(payload?.categories) ? payload.categories : [],
+      });
+    };
+    script.onerror = () => finish(new Error("スプレッドシートの商品を取得できませんでした。"));
+    script.src = `${url}${separator}callback=${encodeURIComponent(callbackName)}&_=${Date.now()}`;
+    document.head.appendChild(script);
+  });
+}
+
+function applyRemoteProductData(data) {
+  products = data.products.map(normalizeProduct);
+  customCategories = normalizeCustomCategories(data.categories);
+  saveCustomCategories();
+  renderCategoryChecks([]);
+  renderCustomCategoryList();
+  savePreview();
+  renderList();
+}
+
+async function refreshProductsFromSheet(showMessage = false) {
+  const url = adminSheetDataUrl();
+  if (!url.startsWith("https://script.google.com/")) return false;
+  try {
+    const data = await loadRemoteProductData(url);
+    applyRemoteProductData(data);
+    if (showMessage) message("スプレッドシートの最新商品・在庫を読み込みました。");
+    return true;
+  } catch (error) {
+    if (showMessage) message("スプレッドシートの読み込みに失敗しました。少し待って再度お試しください。");
+    return false;
+  }
+}
+
 async function loadProducts() {
   const saved = localStorage.getItem(storageKey);
+  const remoteUrl = adminSheetDataUrl();
+  if (remoteUrl.startsWith("https://script.google.com/")) {
+    try {
+      const data = await loadRemoteProductData(remoteUrl);
+      if (data.products.length || !saved) {
+        applyRemoteProductData(data);
+        return;
+      }
+    } catch (error) {
+      console.warn("スプレッドシートの商品取得に失敗したため、ブラウザ内の商品を表示します。", error);
+    }
+  }
   if (saved) {
     products = JSON.parse(saved).map(normalizeProduct);
     savePreview();
@@ -754,3 +826,6 @@ clearForm();
 sheetWebhookUrl.value = localStorage.getItem(sheetUrlKey) || window.ANDTETE_CONFIG?.sheetWebAppUrl || "";
 sheetSyncToken.value = localStorage.getItem(sheetTokenKey) || "";
 loadProducts();
+
+window.addEventListener("focus", () => refreshProductsFromSheet(false));
+window.setInterval(() => refreshProductsFromSheet(false), Math.max(15000, Number(window.ANDTETE_CONFIG?.refreshIntervalMs || 30000)));

@@ -103,7 +103,7 @@ function readProductsFromSheets_() {
   const products = rows.filter(function(row) { return String(row[0] || row[1] || '').trim(); }).map(function(row, index) {
     const id = String(row[0] || ('sheet-item-' + (index + 2))).trim();
     const base = baselineById[id] || {};
-    const image = String(row[9] || base.image || './assets/hero-handmade.png').trim();
+    const image = normalizeImageUrl_(String(row[9] || base.image || './assets/hero-handmade.png').trim());
     const variants = parseVariants_(row[4]);
     const options = parseOptions_(row[10]);
     const sheetStock = Math.max(0, Number(row[3] || 0));
@@ -117,7 +117,7 @@ function readProductsFromSheets_() {
       stock: stock,
       description: String(row[8] || base.description || ''),
       image: image,
-      images: Array.isArray(base.images) && base.images.length ? replaceFirstImage_(base.images, image) : [image],
+      images: Array.isArray(base.images) && base.images.length ? replaceFirstImage_(base.images.map(normalizeImageUrl_), image) : [image],
       stripeUrl: String(base.stripeUrl || ''),
       label: String(row[7] || base.label || ''),
       visible: parseVisible_(row[5]),
@@ -339,13 +339,14 @@ function saveUploadedImages_(products) {
     const publishedImages = images.map(function(image, index) {
       const published = publishImage_(folder, image, String(copy.id || 'item') + '-' + (index + 1));
       imageMap[image] = published;
-      return published;
+      return normalizeImageUrl_(published);
     });
     copy.images = publishedImages;
     copy.image = publishedImages[0] || copy.image || '';
     copy.variants = (Array.isArray(copy.variants) ? copy.variants : []).map(function(variant) {
       const variantCopy = Object.assign({}, variant);
       if (variantCopy.image && imageMap[variantCopy.image]) variantCopy.image = imageMap[variantCopy.image];
+      else variantCopy.image = normalizeImageUrl_(variantCopy.image);
       return variantCopy;
     });
     return copy;
@@ -355,7 +356,7 @@ function saveUploadedImages_(products) {
 function publishImage_(folder, image, baseName) {
   const value = String(image || '');
   const match = value.match(/^data:(image\/[A-Za-z0-9.+-]+);base64,(.+)$/);
-  if (!match) return value;
+  if (!match) return normalizeImageUrl_(value);
   const mimeType = match[1];
   const extension = mimeType.indexOf('png') >= 0 ? 'png' : mimeType.indexOf('webp') >= 0 ? 'webp' : 'jpg';
   const fileName = baseName.replace(/[^0-9A-Za-z_-]/g, '_') + '.' + extension;
@@ -364,7 +365,21 @@ function publishImage_(folder, image, baseName) {
   const blob = Utilities.newBlob(Utilities.base64Decode(match[2]), mimeType, fileName);
   const file = folder.createFile(blob);
   file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-  return 'https://drive.google.com/uc?export=view&id=' + file.getId();
+  return driveImageUrl_(file.getId());
+}
+
+function normalizeImageUrl_(value) {
+  const url = String(value || '').trim();
+  if (!url) return '';
+  const ucMatch = url.match(/[?&]id=([A-Za-z0-9_-]+)/);
+  const fileMatch = url.match(/\/file\/d\/([A-Za-z0-9_-]+)/);
+  const thumbnailMatch = url.match(/drive\.google\.com\/thumbnail\?id=([A-Za-z0-9_-]+)/);
+  const id = (thumbnailMatch || ucMatch || fileMatch || [])[1];
+  return id ? driveImageUrl_(id) : url;
+}
+
+function driveImageUrl_(id) {
+  return 'https://drive.google.com/thumbnail?id=' + encodeURIComponent(id) + '&sz=w2000';
 }
 
 function getImageFolder_() {

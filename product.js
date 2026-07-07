@@ -180,6 +180,13 @@ document.addEventListener("change", (event) => {
   updatePurchaseState(product);
 });
 
+document.addEventListener("error", (event) => {
+  const image = event.target.closest?.(".purchase-main-image, .purchase-thumbs img");
+  if (!image || image.dataset.fallbackApplied) return;
+  image.dataset.fallbackApplied = "true";
+  image.src = defaultProductImage;
+}, true);
+
 async function loadPurchaseProduct() {
   const id = new URLSearchParams(window.location.search).get("id");
   let products = [];
