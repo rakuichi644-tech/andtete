@@ -103,7 +103,9 @@ function readProductsFromSheets_() {
   const products = rows.filter(function(row) { return String(row[0] || row[1] || '').trim(); }).map(function(row, index) {
     const id = String(row[0] || ('sheet-item-' + (index + 2))).trim();
     const base = baselineById[id] || {};
-    const image = normalizeImageUrl_(String(row[9] || base.image || './assets/hero-handmade.png').trim());
+    const sheetImage = String(row[9] || '').trim();
+    const baselineImage = String(base.image || (Array.isArray(base.images) ? base.images[0] : '') || '').trim();
+    const image = normalizeImageUrl_(isUsableImageValue_(sheetImage) ? sheetImage : (baselineImage || './assets/hero-handmade.png'));
     const variants = parseVariants_(row[4]);
     const options = parseOptions_(row[10]);
     const sheetStock = Math.max(0, Number(row[3] || 0));
@@ -376,6 +378,11 @@ function normalizeImageUrl_(value) {
   const thumbnailMatch = url.match(/drive\.google\.com\/thumbnail\?id=([A-Za-z0-9_-]+)/);
   const id = (thumbnailMatch || ucMatch || fileMatch || [])[1];
   return id ? driveImageUrl_(id) : url;
+}
+
+function isUsableImageValue_(value) {
+  const image = String(value || '').trim();
+  return /^(https?:\/\/|data:image\/|\.\.?\/|\/)/i.test(image);
 }
 
 function driveImageUrl_(id) {
