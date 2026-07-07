@@ -1,0 +1,88 @@
+var ANDTETE_PRODUCTS = [
+  {
+    "id": "bag-green-001",
+    "name": "親子で使えるミニかごバッグ",
+    "price": 8800,
+    "stock": 5,
+    "description": "軽く持てるサイズ感。ライブ販売でも紹介しやすい定番アイテムです。",
+    "image": "./assets/item-green-bag.png",
+    "stripeUrl": "",
+    "label": "NEW",
+    "visible": true,
+    "categories": ["new", "recommend", "stock"]
+  },
+  {
+    "id": "mug-pair-001",
+    "name": "やさしい色のペアマグ",
+    "price": 8000,
+    "stock": 3,
+    "description": "ギフトにも選びやすい、落ち着いた色味のペアセット。",
+    "image": "./assets/item-cups.png",
+    "stripeUrl": "",
+    "label": "おすすめ",
+    "visible": true,
+    "categories": ["recommend", "stock"]
+  },
+  {
+    "id": "candle-botanical-001",
+    "name": "ボタニカルキャンドル",
+    "price": 3600,
+    "stock": 8,
+    "description": "お部屋に飾りやすい淡い色味。季節の花材で制作します。",
+    "image": "./assets/item-candles.png",
+    "stripeUrl": "",
+    "label": "即納",
+    "visible": true,
+    "categories": ["new", "stock"]
+  },
+  {
+    "id": "tray-flower-001",
+    "name": "花のアクセサリートレイ",
+    "price": 3300,
+    "stock": 4,
+    "description": "小物置きや撮影小物として使いやすい人気の形です。",
+    "image": "./assets/item-flowers.png",
+    "stripeUrl": "",
+    "label": "予約",
+    "visible": true,
+    "categories": ["recommend", "preorder"]
+  },
+  {
+    "id": "bag-natural-001",
+    "name": "生成りの透かし編みバッグ",
+    "price": 9400,
+    "stock": 2,
+    "description": "次回ライブで予約受付予定。数量限定の掲載枠です。",
+    "image": "./assets/item-natural-bag.png",
+    "stripeUrl": "",
+    "label": "予約商品",
+    "visible": true,
+    "categories": ["new", "preorder"]
+  },
+  {
+    "id": "linen-cloth-001",
+    "name": "やわらかリネンクロス",
+    "price": 2400,
+    "stock": 12,
+    "description": "子どもとの食卓にもなじむ、洗いやすい布小物。",
+    "image": "./assets/item-linen.png",
+    "stripeUrl": "",
+    "label": "おすすめ",
+    "visible": true,
+    "categories": ["recommend", "stock"]
+  },
+  {
+    "id": "plate-petal-001",
+    "name": "花びらの小皿",
+    "price": 2900,
+    "stock": 6,
+    "description": "アクセサリーやお菓子を少し置くのにちょうどよい小皿。",
+    "image": "./assets/item-plate.png",
+    "stripeUrl": "",
+    "label": "NEW",
+    "visible": true,
+    "categories": ["new", "stock"]
+  }
+];
+
+window.ANDTETE_PRODUCTS = ANDTETE_PRODUCTS;
