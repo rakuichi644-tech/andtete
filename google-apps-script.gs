@@ -1,6 +1,7 @@
 const PRODUCT_SHEET = '商品一覧';
 const VARIANT_SHEET = 'カラー在庫';
 const OPTION_SHEET = '追加オプション';
+const UNIFIED_SHEET = '商品管理';
 const CATEGORY_SHEET = '商品タブ';
 const SETTINGS_SHEET = '設定';
 const DATA_SHEET = 'HP商品データ';
@@ -12,16 +13,17 @@ function setupProject() {
   const token = getWriteToken_() || Utilities.getUuid().replace(/-/g, '');
 
   writeSettings_(token);
-  ensureSheet_(PRODUCT_SHEET, productHeaders_());
-  ensureSheet_(VARIANT_SHEET, variantHeaders_());
-  ensureSheet_(OPTION_SHEET, optionHeaders_());
+  const unifiedSheet = ensureSheet_(UNIFIED_SHEET, unifiedHeaders_());
   ensureSheet_(CATEGORY_SHEET, categoryHeaders_());
   ensureSheet_(DATA_SHEET, ['JSON']);
+
+  if (unifiedSheet.getLastRow() < 2) migrateLegacySheets_();
+  hideLegacySheets_();
 
   const dataSheet = spreadsheet.getSheetByName(DATA_SHEET);
   if (dataSheet && !dataSheet.isSheetHidden()) dataSheet.hideSheet();
 
-  spreadsheet.setActiveSheet(spreadsheet.getSheetByName(PRODUCT_SHEET));
+  spreadsheet.setActiveSheet(spreadsheet.getSheetByName(UNIFIED_SHEET));
   return token;
 }
 
@@ -40,7 +42,7 @@ function doPost(e) {
     const categories = normalizeCategories_(payload.categories);
     const publishedProducts = saveUploadedImages_(products);
 
-    writeProductSheets_(publishedProducts, categories);
+    writeUnifiedSheet_(publishedProducts, categories);
     writeHiddenData_({ products: publishedProducts, categories: categories });
 
     return jsonOutput_({ ok: true, count: publishedProducts.length, updatedAt: new Date().toISOString() });
@@ -68,51 +70,26 @@ function doGet(e) {
   return ContentService.createTextOutput(payload).setMimeType(ContentService.MimeType.JSON);
 }
 
-function writeProductSheets_(products, categories) {
+function writeUnifiedSheet_(products, categories) {
   const productRows = products.map(function(product) {
     return [
       product.id || '',
       product.name || '',
       Number(product.price || 0),
       Number(product.stock || 0),
+      formatVariants_(product.variants),
       product.visible === false ? '非表示' : '表示',
       (product.categories || []).join(', '),
       product.label || '',
-      product.stripeUrl || '',
       product.description || '',
       product.image || (product.images && product.images[0]) || '',
+      formatOptions_(product.options),
       new Date().toISOString()
     ];
   });
 
-  const variantRows = [];
-  products.forEach(function(product) {
-    (Array.isArray(product.variants) ? product.variants : []).forEach(function(variant) {
-      variantRows.push([
-        product.id || '',
-        variant.name || '',
-        Number(variant.stock || 0),
-        variant.stripeUrl || '',
-        variant.image || ''
-      ]);
-    });
-  });
-
-  const optionRows = [];
-  products.forEach(function(product) {
-    (Array.isArray(product.options) ? product.options : []).forEach(function(option) {
-      optionRows.push([
-        product.id || '',
-        option.name || '',
-        Number(option.priceAdjustment || 0)
-      ]);
-    });
-  });
-
   const categoryRows = categories.map(function(category) { return [category.key, category.label]; });
-  writeTable_(PRODUCT_SHEET, productHeaders_(), productRows);
-  writeTable_(VARIANT_SHEET, variantHeaders_(), variantRows);
-  writeTable_(OPTION_SHEET, optionHeaders_(), optionRows);
+  writeTable_(UNIFIED_SHEET, unifiedHeaders_(), productRows);
   writeTable_(CATEGORY_SHEET, categoryHeaders_(), categoryRows);
 }
 
@@ -121,19 +98,17 @@ function readProductsFromSheets_() {
   const baselineById = {};
   baseline.products.forEach(function(product) { baselineById[String(product.id || '')] = product; });
 
-  const variantsById = groupVariants_();
-  const optionsById = groupOptions_();
-  const rows = readRows_(PRODUCT_SHEET, productHeaders_().length);
+  const rows = readRows_(UNIFIED_SHEET, unifiedHeaders_().length);
 
   const products = rows.filter(function(row) { return String(row[0] || row[1] || '').trim(); }).map(function(row, index) {
     const id = String(row[0] || ('sheet-item-' + (index + 2))).trim();
     const base = baselineById[id] || {};
     const image = String(row[9] || base.image || './assets/hero-handmade.png').trim();
-    const variants = Object.prototype.hasOwnProperty.call(variantsById, id) ? variantsById[id] : (base.variants || []);
-    const options = Object.prototype.hasOwnProperty.call(optionsById, id) ? optionsById[id] : (base.options || []);
+    const variants = parseVariants_(row[4]);
+    const options = parseOptions_(row[10]);
     const sheetStock = Math.max(0, Number(row[3] || 0));
     const stock = variants.length ? variants.reduce(function(sum, variant) { return sum + Number(variant.stock || 0); }, 0) : sheetStock;
-    const categories = splitList_(row[5]);
+    const categories = splitList_(row[6]);
 
     return {
       id: id,
@@ -143,9 +118,9 @@ function readProductsFromSheets_() {
       description: String(row[8] || base.description || ''),
       image: image,
       images: Array.isArray(base.images) && base.images.length ? replaceFirstImage_(base.images, image) : [image],
-      stripeUrl: String(row[7] || base.stripeUrl || ''),
-      label: String(row[6] || base.label || ''),
-      visible: parseVisible_(row[4]),
+      stripeUrl: String(base.stripeUrl || ''),
+      label: String(row[7] || base.label || ''),
+      visible: parseVisible_(row[5]),
       categories: categories.length ? categories : (base.categories || ['new']),
       variants: variants,
       options: options
@@ -157,6 +132,44 @@ function readProductsFromSheets_() {
     .map(function(row) { return { key: String(row[0]), label: String(row[1]).trim() }; });
 
   return { products: products, categories: categories };
+}
+
+function migrateLegacySheets_() {
+  const baseline = readHiddenData_();
+  const baselineById = {};
+  baseline.products.forEach(function(product) { baselineById[String(product.id || '')] = product; });
+  const variantsById = groupVariants_();
+  const optionsById = groupOptions_();
+  const rows = readRows_(PRODUCT_SHEET, productHeaders_().length);
+  const migrated = rows.filter(function(row) { return String(row[0] || row[1] || '').trim(); }).map(function(row, index) {
+    const id = String(row[0] || ('sheet-item-' + (index + 2))).trim();
+    const base = baselineById[id] || {};
+    return {
+      id: id,
+      name: String(row[1] || base.name || '名称未設定'),
+      price: Math.max(0, Number(row[2] || 0)),
+      stock: Math.max(0, Number(row[3] || 0)),
+      visible: parseVisible_(row[4]),
+      categories: splitList_(row[5]),
+      label: String(row[6] || base.label || ''),
+      stripeUrl: String(row[7] || base.stripeUrl || ''),
+      description: String(row[8] || base.description || ''),
+      image: String(row[9] || base.image || ''),
+      images: Array.isArray(base.images) ? base.images : [],
+      variants: variantsById[id] || base.variants || [],
+      options: optionsById[id] || base.options || []
+    };
+  });
+  const products = migrated.length ? migrated : baseline.products;
+  if (products.length) writeUnifiedSheet_(products, baseline.categories || []);
+}
+
+function hideLegacySheets_() {
+  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  [PRODUCT_SHEET, VARIANT_SHEET, OPTION_SHEET].forEach(function(name) {
+    const sheet = spreadsheet.getSheetByName(name);
+    if (sheet && !sheet.isSheetHidden()) sheet.hideSheet();
+  });
 }
 
 function groupVariants_() {
@@ -202,8 +215,13 @@ function readHiddenData_() {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(DATA_SHEET);
   if (!sheet || sheet.getLastRow() < 1) return { products: [], categories: [] };
   const json = sheet.getRange(1, 1, sheet.getLastRow(), 1).getValues().map(function(row) { return String(row[0] || ''); }).join('');
-  if (!json) return { products: [], categories: [] };
-  const parsed = JSON.parse(json);
+  if (!json || json === 'JSON') return { products: [], categories: [] };
+  let parsed;
+  try {
+    parsed = JSON.parse(json);
+  } catch (error) {
+    return { products: [], categories: [] };
+  }
   if (Array.isArray(parsed)) return { products: parsed, categories: [] };
   return {
     products: Array.isArray(parsed.products) ? parsed.products : [],
@@ -255,7 +273,40 @@ function productHeaders_() {
 }
 function variantHeaders_() { return ['商品ID', 'カラー名', '在庫数', 'Stripeリンク', '画像URL']; }
 function optionHeaders_() { return ['商品ID', 'オプション名', '追加料金']; }
+function unifiedHeaders_() {
+  return ['商品ID', '商品名', '基本価格', '在庫数', 'カラー別在庫', 'HP表示', '掲載カテゴリキー', '表示ラベル', '説明', '画像URL', '追加オプション', '更新日時'];
+}
 function categoryHeaders_() { return ['タブキー', 'タブ名']; }
+
+function formatVariants_(variants) {
+  return (Array.isArray(variants) ? variants : []).map(function(variant) {
+    return String(variant.name || '') + ':' + Math.max(0, Number(variant.stock || 0));
+  }).filter(function(value) { return value.charAt(0) !== ':'; }).join('\n');
+}
+
+function formatOptions_(options) {
+  return (Array.isArray(options) ? options : []).map(function(option) {
+    return String(option.name || '') + ':+' + Math.max(0, Number(option.priceAdjustment || 0));
+  }).filter(function(value) { return value.indexOf(':+') !== 0; }).join('\n');
+}
+
+function splitEntries_(value) {
+  return String(value || '').split(/\r?\n|\s*\/\s*|、|,/).map(function(entry) { return entry.trim(); }).filter(Boolean);
+}
+
+function parseVariants_(value) {
+  return splitEntries_(value).map(function(entry) {
+    const match = entry.match(/^(.+?)\s*[:：]\s*(\d+)$/);
+    return match ? { name: match[1].trim(), stock: Math.max(0, Number(match[2])) } : null;
+  }).filter(Boolean);
+}
+
+function parseOptions_(value) {
+  return splitEntries_(value).map(function(entry) {
+    const match = entry.match(/^(.+?)\s*[:：]\s*\+?(\d+)$/);
+    return match ? { name: match[1].trim(), priceAdjustment: Math.max(0, Number(match[2])) } : null;
+  }).filter(Boolean);
+}
 
 function normalizeCategories_(categories) {
   return Array.isArray(categories) ? categories.filter(function(category) {
