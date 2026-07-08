@@ -5,6 +5,8 @@ const categoryLabels = {
   stock: "即納",
 };
 
+const cartStorageKey = "andteteCart";
+
 function formatPrice(price) {
   return `${Number(price).toLocaleString("ja-JP")}円`;
 }
@@ -42,11 +44,76 @@ function stockText(stockValue) {
   return `残り${stock.toLocaleString("ja-JP")}点`;
 }
 
+function cartIconSvg() {
+  return `
+    <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="8" cy="21" r="1" />
+      <circle cx="19" cy="21" r="1" />
+      <path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12" />
+    </svg>
+  `;
+}
+
 function purchaseMarkup(productId, stockValue) {
   const inStock = Number(stockValue ?? 1) > 0;
   return inStock
-    ? `<a class="buy-link" href="./product.html?id=${encodeURIComponent(productId)}">商品ページへ</a>`
+    ? `<a class="buy-link detail-link" href="./product.html?id=${encodeURIComponent(productId)}">商品ページへ</a>
+       <button class="quick-cart-button" type="button" data-add-card-cart aria-label="かごに入れる">${cartIconSvg()}</button>`
     : `<span class="disabled-link">在庫なし</span>`;
+}
+
+function readCart() {
+  try {
+    const cart = JSON.parse(localStorage.getItem(cartStorageKey) || "[]");
+    return Array.isArray(cart) ? cart : [];
+  } catch (error) {
+    return [];
+  }
+}
+
+function writeCart(cart) {
+  localStorage.setItem(cartStorageKey, JSON.stringify(cart));
+}
+
+function addListProductToCart(product, card) {
+  const variantSelect = card?.querySelector("[data-variant-select]");
+  const selectedVariant = variantSelect?.options[variantSelect.selectedIndex];
+  const variant = selectedVariant?.textContent.trim() || "";
+  const stock = Number(selectedVariant?.dataset.stock || product.stock || 0);
+  if (stock <= 0) return { ok: false, message: "在庫がありません。" };
+
+  const image = selectedVariant?.dataset.image || card?.querySelector(".product-main-image")?.currentSrc || card?.querySelector(".product-main-image")?.src || productImages(product)[0] || "./assets/hero-handmade.png";
+  const item = {
+    productId: String(product.id || ""),
+    name: String(product.name || ""),
+    price: Number(product.price || 0),
+    image,
+    variant,
+    options: [],
+    quantity: 1,
+  };
+  const key = JSON.stringify([item.productId, item.variant, item.options]);
+  const cart = readCart();
+  const existing = cart.find((row) => JSON.stringify([row.productId, row.variant, row.options || []]) === key);
+  if (existing) existing.quantity = Math.min(20, Number(existing.quantity || 1) + 1);
+  else cart.push(item);
+  writeCart(cart);
+  return { ok: true, count: cart.reduce((sum, row) => sum + Number(row.quantity || 1), 0) };
+}
+
+function showCartToast(text) {
+  let toast = document.querySelector("[data-cart-toast]");
+  if (!toast) {
+    toast = document.createElement("p");
+    toast.className = "cart-toast";
+    toast.dataset.cartToast = "";
+    toast.setAttribute("aria-live", "polite");
+    document.body.appendChild(toast);
+  }
+  toast.textContent = text;
+  toast.classList.add("show");
+  window.clearTimeout(showCartToast.timer);
+  showCartToast.timer = window.setTimeout(() => toast.classList.remove("show"), 2200);
 }
 
 function productCard(product) {
@@ -229,6 +296,16 @@ document.addEventListener("click", (event) => {
   const openList = event.target.closest("[data-open-list]");
   if (openList) {
     renderListProducts(openList.dataset.openList);
+    return;
+  }
+
+  const quickCart = event.target.closest("[data-add-card-cart]");
+  if (quickCart) {
+    const card = quickCart.closest(".product-card");
+    const product = allProductsCache.find((item) => String(item.id || "") === String(card?.dataset.productId || ""));
+    if (!product || !card) return;
+    const result = addListProductToCart(product, card);
+    showCartToast(result.ok ? `かごに追加しました。現在${result.count}点入っています。` : result.message);
     return;
   }
 

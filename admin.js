@@ -49,6 +49,9 @@ let currentOptions = [];
 let customCategories = [];
 let activeAdminFilter = "all";
 let activeAdminPage = 1;
+let imageDragIndex = null;
+let imagePointerDrag = null;
+let suppressImageClick = false;
 
 function uid() {
   return `item-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
@@ -255,19 +258,24 @@ function renderImageThumbs() {
   imageThumbs.innerHTML = currentImages
     .map(
       (image, index) => `
-        <div class="image-thumb-wrap">
+        <div class="image-thumb-wrap" data-image-drag="${index}" draggable="true">
           <button class="image-thumb ${index === 0 ? "active" : ""}" type="button" data-image-index="${index}" aria-label="写真${index + 1}をメインにする">
             <img src="${image}" alt="登録写真${index + 1}" />
             <span>${index + 1}</span>
           </button>
-          <div class="image-order-controls">
-            <button type="button" data-image-move="${index}" data-image-direction="-1" ${index === 0 ? "disabled" : ""}>前へ</button>
-            <button type="button" data-image-move="${index}" data-image-direction="1" ${index === currentImages.length - 1 ? "disabled" : ""}>後へ</button>
-          </div>
         </div>
       `
     )
     .join("");
+}
+
+function reorderImages(fromIndex, toIndex) {
+  if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || fromIndex >= currentImages.length || toIndex >= currentImages.length) return;
+  const reordered = currentImages.slice();
+  const [moved] = reordered.splice(fromIndex, 1);
+  reordered.splice(toIndex, 0, moved);
+  setImages(reordered);
+  message("写真の順番を変更しました。1枚目がメイン写真です。");
 }
 
 function readForm() {
@@ -526,6 +534,65 @@ function sheetRows() {
   }));
 }
 
+function wait(ms) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+function remoteHasExpectedProducts(remote, expectedIds) {
+  const remoteIds = remote.products.map((product) => String(product.id || ""));
+  return expectedIds.every((id) => remoteIds.includes(id));
+}
+
+async function waitForSheetReflection(url, expectedIds) {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    await wait(attempt === 0 ? 1800 : 2400);
+    const remote = await loadRemoteProductData(url);
+    if (remoteHasExpectedProducts(remote, expectedIds)) return remote;
+  }
+  return null;
+}
+
+async function postSheetWithFetch(url, payload) {
+  await fetch(url, {
+    method: "POST",
+    mode: "no-cors",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify(payload),
+  });
+}
+
+function postSheetWithForm(url, payload) {
+  return new Promise((resolve) => {
+    const frameName = `andteteSyncFrame_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+    const iframe = document.createElement("iframe");
+    const formElement = document.createElement("form");
+    const field = document.createElement("textarea");
+    let finished = false;
+
+    function cleanup() {
+      if (finished) return;
+      finished = true;
+      formElement.remove();
+      iframe.remove();
+      resolve();
+    }
+
+    iframe.name = frameName;
+    iframe.hidden = true;
+    iframe.addEventListener("load", cleanup, { once: true });
+    formElement.method = "POST";
+    formElement.action = url;
+    formElement.target = frameName;
+    formElement.hidden = true;
+    field.name = "payload";
+    field.value = JSON.stringify(payload);
+    formElement.appendChild(field);
+    document.body.append(iframe, formElement);
+    formElement.submit();
+    window.setTimeout(cleanup, 15000);
+  });
+}
+
 async function saveSheetUrl() {
   const url = sheetWebhookUrl.value.trim();
   const token = sheetSyncToken.value.trim();
@@ -548,6 +615,7 @@ async function sendToSheet(silent = false, successText = "スプシとHPへ同�
   const url = String(sheetWebhookUrl.value || window.ANDTETE_CONFIG?.sheetWebAppUrl || "").trim();
   const token = String(sheetSyncToken.value || localStorage.getItem(sheetTokenKey) || "").trim();
   const expectedIds = products.map((product) => String(product.id || ""));
+  const payload = { token, products, categories: customCategories };
 
   if (!url.startsWith("https://script.google.com/")) {
     if (!silent) message("ブラウザ内には保存しました。全端末へ自動反映するには、Google Apps Scriptの連携URLを入力してください。");
@@ -559,17 +627,15 @@ async function sendToSheet(silent = false, successText = "スプシとHPへ同�
   }
 
   try {
-    await fetch(url, {
-      method: "POST",
-      mode: "no-cors",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ token, products, categories: customCategories }),
-    });
-    await new Promise((resolve) => window.setTimeout(resolve, 2500));
-    const remote = await loadRemoteProductData(url);
-    const remoteIds = remote.products.map((product) => String(product.id || ""));
-    const verified = expectedIds.every((id) => remoteIds.includes(id));
-    if (!verified) {
+    await postSheetWithFetch(url, payload);
+    let remote = await waitForSheetReflection(url, expectedIds);
+
+    if (!remote) {
+      await postSheetWithForm(url, payload);
+      remote = await waitForSheetReflection(url, expectedIds);
+    }
+
+    if (!remote) {
       message("保存はできましたが、スプシ・HPへの反映確認ができません。管理用同期キーとApps Script URLを確認してください。");
       return false;
     }
@@ -673,16 +739,8 @@ imagePreset.addEventListener("change", () => {
 });
 
 imageThumbs.addEventListener("click", (event) => {
-  const moveButton = event.target.closest("[data-image-move]");
-  if (moveButton) {
-    const index = Number(moveButton.dataset.imageMove);
-    const nextIndex = index + Number(moveButton.dataset.imageDirection);
-    if (nextIndex < 0 || nextIndex >= currentImages.length) return;
-    const reordered = currentImages.slice();
-    const [moved] = reordered.splice(index, 1);
-    reordered.splice(nextIndex, 0, moved);
-    setImages(reordered);
-    message("写真の順番を変更しました。1枚目がメイン写真です。");
+  if (suppressImageClick) {
+    suppressImageClick = false;
     return;
   }
 
@@ -694,6 +752,76 @@ imageThumbs.addEventListener("click", (event) => {
   currentImages = [selected, ...currentImages.filter((_, imageIndex) => imageIndex !== index)];
   setImages(currentImages);
   message("メイン写真を変更しました。");
+});
+
+imageThumbs.addEventListener("dragstart", (event) => {
+  const item = event.target.closest("[data-image-drag]");
+  if (!item) return;
+  imageDragIndex = Number(item.dataset.imageDrag);
+  item.classList.add("dragging");
+  event.dataTransfer.effectAllowed = "move";
+  event.dataTransfer.setData("text/plain", String(imageDragIndex));
+});
+
+imageThumbs.addEventListener("dragover", (event) => {
+  const item = event.target.closest("[data-image-drag]");
+  if (!item || imageDragIndex == null) return;
+  event.preventDefault();
+  imageThumbs.querySelectorAll(".image-thumb-wrap").forEach((thumb) => thumb.classList.toggle("drag-over", thumb === item));
+});
+
+imageThumbs.addEventListener("drop", (event) => {
+  const item = event.target.closest("[data-image-drag]");
+  event.preventDefault();
+  imageThumbs.querySelectorAll(".image-thumb-wrap").forEach((thumb) => thumb.classList.remove("drag-over", "dragging"));
+  if (!item || imageDragIndex == null) return;
+  reorderImages(imageDragIndex, Number(item.dataset.imageDrag));
+  imageDragIndex = null;
+});
+
+imageThumbs.addEventListener("dragend", () => {
+  imageDragIndex = null;
+  imageThumbs.querySelectorAll(".image-thumb-wrap").forEach((thumb) => thumb.classList.remove("drag-over", "dragging"));
+});
+
+imageThumbs.addEventListener("pointerdown", (event) => {
+  const item = event.target.closest("[data-image-drag]");
+  if (!item || event.pointerType === "mouse") return;
+  imagePointerDrag = {
+    from: Number(item.dataset.imageDrag),
+    x: event.clientX,
+    y: event.clientY,
+    active: false,
+  };
+  item.setPointerCapture?.(event.pointerId);
+});
+
+imageThumbs.addEventListener("pointermove", (event) => {
+  if (!imagePointerDrag || event.pointerType === "mouse") return;
+  const distance = Math.hypot(event.clientX - imagePointerDrag.x, event.clientY - imagePointerDrag.y);
+  if (distance > 12) {
+    imagePointerDrag.active = true;
+    suppressImageClick = true;
+  }
+  if (!imagePointerDrag.active) return;
+  event.preventDefault();
+  const item = document.elementFromPoint(event.clientX, event.clientY)?.closest("[data-image-drag]");
+  imageThumbs.querySelectorAll(".image-thumb-wrap").forEach((thumb) => thumb.classList.toggle("drag-over", thumb === item));
+});
+
+imageThumbs.addEventListener("pointerup", (event) => {
+  if (!imagePointerDrag || event.pointerType === "mouse") return;
+  const target = document.elementFromPoint(event.clientX, event.clientY)?.closest("[data-image-drag]");
+  const from = imagePointerDrag.from;
+  const wasActive = imagePointerDrag.active;
+  imagePointerDrag = null;
+  imageThumbs.querySelectorAll(".image-thumb-wrap").forEach((thumb) => thumb.classList.remove("drag-over", "dragging"));
+  if (wasActive && target) reorderImages(from, Number(target.dataset.imageDrag));
+});
+
+imageThumbs.addEventListener("pointercancel", () => {
+  imagePointerDrag = null;
+  imageThumbs.querySelectorAll(".image-thumb-wrap").forEach((thumb) => thumb.classList.remove("drag-over", "dragging"));
 });
 
 document.querySelector("#addVariant").addEventListener("click", () => {

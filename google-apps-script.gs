@@ -32,7 +32,7 @@ function doPost(e) {
   lock.waitLock(30000);
 
   try {
-    const payload = JSON.parse((e && e.postData && e.postData.contents) || '{}');
+    const payload = parseSyncPayload_(e);
     const expectedToken = getWriteToken_();
     if (!expectedToken || String(payload.token || '') !== expectedToken) {
       return jsonOutput_({ ok: false, error: '管理用同期キーが正しくありません。' });
@@ -51,6 +51,30 @@ function doPost(e) {
   } finally {
     lock.releaseLock();
   }
+}
+
+function parseSyncPayload_(e) {
+  const parameterPayload = e && e.parameter ? String(e.parameter.payload || '') : '';
+  if (parameterPayload) return JSON.parse(parameterPayload);
+
+  const raw = String((e && e.postData && e.postData.contents) || '').trim();
+  if (!raw) return {};
+  if (raw.charAt(0) === '{' || raw.charAt(0) === '[') return JSON.parse(raw);
+
+  const decoded = decodeFormBody_(raw);
+  if (decoded.payload) return JSON.parse(decoded.payload);
+  return decoded;
+}
+
+function decodeFormBody_(body) {
+  return body.split('&').reduce(function(result, pair) {
+    if (!pair) return result;
+    const parts = pair.split('=');
+    const key = decodeURIComponent(String(parts.shift() || '').replace(/\+/g, ' '));
+    const value = decodeURIComponent(String(parts.join('=') || '').replace(/\+/g, ' '));
+    result[key] = value;
+    return result;
+  }, {});
 }
 
 function doGet(e) {
