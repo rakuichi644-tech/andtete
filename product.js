@@ -70,6 +70,45 @@ function formatProductPrice(price) {
   return `${Number(price || 0).toLocaleString("ja-JP")}円`;
 }
 
+function createCheckoutUrl(params) {
+  const endpoint = productSheetUrl();
+  if (!endpoint.startsWith("https://script.google.com/")) {
+    return Promise.reject(new Error("決済連携URLが未設定です。"));
+  }
+
+  return new Promise((resolve, reject) => {
+    const callbackName = `andteteCheckoutCallback_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+    const script = document.createElement("script");
+    const query = new URLSearchParams({
+      action: "checkout",
+      callback: callbackName,
+      productId: params.productId,
+      variant: params.variant || "",
+      options: (params.options || []).join(","),
+      quantity: "1",
+      successUrl: `${window.location.origin}${window.location.pathname}?id=${encodeURIComponent(params.productId)}&paid=1`,
+      cancelUrl: window.location.href,
+      _: String(Date.now()),
+    });
+    const separator = endpoint.includes("?") ? "&" : "?";
+    const timeout = window.setTimeout(() => finish(new Error("決済画面の作成がタイムアウトしました。")), 15000);
+
+    function finish(error, payload) {
+      window.clearTimeout(timeout);
+      script.remove();
+      delete window[callbackName];
+      if (error) reject(error);
+      else if (payload?.ok && payload.url) resolve(payload.url);
+      else reject(new Error(payload?.error || "決済画面を作成できませんでした。"));
+    }
+
+    window[callbackName] = (payload) => finish(null, payload);
+    script.onerror = () => finish(new Error("決済連携に接続できませんでした。"));
+    script.src = `${endpoint}${separator}${query.toString()}`;
+    document.head.appendChild(script);
+  });
+}
+
 function renderPurchaseProduct(product) {
   const container = document.querySelector("#purchaseProduct");
   const images = productPageImages(product);
@@ -101,7 +140,7 @@ function renderPurchaseProduct(product) {
             <label>
               <span>カラーを選択</span>
               <select data-purchase-variant>
-                ${variants.map((variant, index) => `<option value="${index}" data-stock="${Number(variant.stock ?? 0)}" data-image="${escapeProductHtml(variant.image || "")}" data-stripe-url="${escapeProductHtml(variant.stripeUrl || product.stripeUrl || "")}">${escapeProductHtml(variant.name)}（残り${Number(variant.stock ?? 0)}点）</option>`).join("")}
+                ${variants.map((variant, index) => `<option value="${index}" data-variant-name="${escapeProductHtml(variant.name)}" data-stock="${Number(variant.stock ?? 0)}" data-image="${escapeProductHtml(variant.image || "")}">${escapeProductHtml(variant.name)}（残り${Number(variant.stock ?? 0)}点）</option>`).join("")}
               </select>
             </label>
           </fieldset>` : ""}
@@ -125,7 +164,7 @@ function renderPurchaseProduct(product) {
         </div>
         <p class="purchase-stock" data-purchase-stock>${variants.length ? `残り${Number(firstVariant?.stock ?? 0)}点` : `残り${Number(product.stock ?? 0)}点`}</p>
         <div data-checkout-slot></div>
-        ${options.length ? `<p class="checkout-note">追加料金を正しく決済するため、Stripe画面にも同じオプションを設定します。公開前に決済リンクとの対応を確認してください。</p>` : ""}
+        <p class="checkout-note">選択内容に合わせてStripeの安全な決済画面を自動作成します。</p>
       </div>
     </section>
   `;
@@ -139,7 +178,6 @@ function updatePurchaseState(product) {
   const variantSelect = card.querySelector("[data-purchase-variant]");
   const selectedVariant = variantSelect ? variantSelect.options[variantSelect.selectedIndex] : null;
   const stock = selectedVariant ? Number(selectedVariant.dataset.stock || 0) : Number(product.stock ?? 0);
-  const stripeUrl = selectedVariant?.dataset.stripeUrl || product.stripeUrl || "";
   const optionTotal = [...card.querySelectorAll("[data-addon-option]:checked")]
     .reduce((sum, input) => sum + Number(input.dataset.addonPrice || 0), 0);
   const total = Number(product.price || 0) + optionTotal;
@@ -153,14 +191,38 @@ function updatePurchaseState(product) {
 
   if (stock <= 0) {
     checkoutSlot.innerHTML = `<span class="disabled-link purchase-checkout">在庫なし</span>`;
-  } else if (stripeUrl.startsWith("https://")) {
-    checkoutSlot.innerHTML = `<a class="primary-link purchase-checkout" href="${escapeProductHtml(stripeUrl)}" target="_blank" rel="noreferrer">Stripe決済へ進む</a>`;
   } else {
-    checkoutSlot.innerHTML = `<span class="disabled-link purchase-checkout">Stripe決済リンク準備中</span>`;
+    checkoutSlot.innerHTML = `<button class="primary-link purchase-checkout" type="button" data-create-checkout>Stripe決済へ進む</button>`;
   }
 }
 
 document.addEventListener("click", (event) => {
+  const checkoutButton = event.target.closest("[data-create-checkout]");
+  if (checkoutButton) {
+    const product = window.ANDTETE_ACTIVE_PRODUCT;
+    const variantSelect = document.querySelector("[data-purchase-variant]");
+    const selectedVariant = variantSelect?.options[variantSelect.selectedIndex]?.dataset.variantName || "";
+    const selectedOptions = [...document.querySelectorAll("[data-addon-option]:checked")].map((input) => {
+      return input.closest(".addon-option")?.querySelector("span")?.textContent.trim() || "";
+    }).filter(Boolean);
+
+    checkoutButton.disabled = true;
+    checkoutButton.textContent = "決済画面を作成中";
+    createCheckoutUrl({
+      productId: String(product.id || ""),
+      variant: selectedVariant,
+      options: selectedOptions,
+    }).then((url) => {
+      window.location.href = url;
+    }).catch((error) => {
+      checkoutButton.disabled = false;
+      checkoutButton.textContent = "Stripe決済へ進む";
+      const slot = document.querySelector("[data-checkout-slot]");
+      if (slot) slot.insertAdjacentHTML("beforeend", `<p class="checkout-error">${escapeProductHtml(error.message || "決済画面を作成できませんでした。")}</p>`);
+    });
+    return;
+  }
+
   const thumb = event.target.closest("[data-purchase-thumb]");
   if (!thumb) return;
   const image = document.querySelector(".purchase-main-image");

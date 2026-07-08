@@ -31,7 +31,6 @@ function productVariants(product) {
         .map((variant) => ({
           name: String(variant.name || "").trim(),
           stock: variant.stock === "" || variant.stock == null ? product.stock : Number(variant.stock),
-          stripeUrl: String(variant.stripeUrl || "").trim(),
           image: String(variant.image || "").trim(),
         }))
     : [];
@@ -80,7 +79,6 @@ function productCard(product) {
                 <option
                   value="${index}"
                   data-stock="${escapeHtml(variant.stock)}"
-                  data-stripe-url="${escapeHtml(variant.stripeUrl || product.stripeUrl || "")}"
                   data-image="${escapeHtml(variant.image || "")}"
                 >${escapeHtml(variant.name)}</option>
               `

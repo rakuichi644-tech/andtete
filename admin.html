@@ -11,7 +11,7 @@
       href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./styles.css?v=20260708-3" />
+    <link rel="stylesheet" href="./styles.css?v=20260708-2" />
   </head>
   <body class="admin-body">
     <main class="admin-shell easy-admin">
@@ -83,13 +83,9 @@
           <label class="span-2">商品説明
             <textarea id="description" placeholder="商品の特徴やお知らせを書きます"></textarea>
           </label>
-          <label class="span-2">Stripe購入リンク
-            <input id="stripeUrl" placeholder="https://buy.stripe.com/...  商品全体の購入リンク" />
-          </label>
-
           <fieldset class="span-2 easy-fieldset variant-fieldset">
             <legend>カラーバリエーション</legend>
-            <p>色違いがある場合だけ追加してください。色ごとに在庫数・写真・Stripeリンクを設定できます。合計在庫は自動計算されます。</p>
+            <p>色違いがある場合だけ追加してください。色ごとに在庫数と写真を設定できます。合計在庫は自動計算されます。</p>
             <div class="variant-list" id="variantList"></div>
             <button class="primary-link soft-button variant-add" type="button" id="addVariant">色を追加</button>
           </fieldset>
@@ -126,7 +122,7 @@
             <h2 id="category-manager-title">商品タブを追加</h2>
           </div>
         </div>
-        <p>「季節商品」「ギフト」など、お客様がHPで選べる商品タブを自由に追加・削除できます。タブを削除しても商品は消えず、「すべて」に残ります。</p>
+        <p>「季節商品」「ギフト」など、お客様がHPで選べる商品タブを自由に追加できます。</p>
         <div class="category-manager-form">
           <input id="newCategoryName" placeholder="例: 季節商品" />
           <button class="primary-link" type="button" id="addCategory">タブを追加</button>
@@ -143,6 +139,7 @@
           <div class="easy-actions">
             <a class="primary-link" href="./index.html" target="_blank" rel="noreferrer">HPで確認</a>
             <button class="primary-link" type="button" id="exportProducts">公開用ファイルを作る</button>
+            <button class="primary-link soft-button" type="button" id="resetProducts">初期データに戻す</button>
           </div>
         </div>
         <div class="admin-product-tools">
@@ -194,6 +191,6 @@
 
     <script src="./site-config.js"></script>
     <script src="./data/products.js"></script>
-    <script src="./admin.js?v=20260708-3"></script>
+    <script src="./admin.js"></script>
   </body>
 </html>

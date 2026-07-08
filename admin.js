@@ -109,7 +109,7 @@ function renderCategoryChecks(selectedCategories = getCategories()) {
 
 function renderCustomCategoryList() {
   customCategoryList.innerHTML = customCategories.length
-    ? customCategories.map((category) => `<span class="custom-category-chip"><span>${escapeHtml(category.label)}</span><button type="button" data-delete-category="${escapeHtml(category.key)}" aria-label="${escapeHtml(category.label)}タブを削除">タブを削除</button></span>`).join("")
+    ? customCategories.map((category) => `<span class="custom-category-chip">${escapeHtml(category.label)}<button type="button" data-delete-category="${escapeHtml(category.key)}" aria-label="${escapeHtml(category.label)}を削除">×</button></span>`).join("")
     : `<span class="empty-message">追加したタブはありません。</span>`;
 }
 
@@ -150,7 +150,6 @@ function normalizeVariants(product) {
         .map((variant) => ({
           name: String(variant.name || "").trim(),
           stock: Math.max(0, Number(variant.stock ?? 0)),
-          stripeUrl: String(variant.stripeUrl || "").trim(),
           imageIndex: Math.max(0, Number(variant.imageIndex ?? 0)),
           image: String(variant.image || "").trim(),
         }))
@@ -169,7 +168,6 @@ function collectVariants() {
       return {
         name: row.querySelector("[data-variant-field='name']").value.trim(),
         stock: Math.max(0, Number(row.querySelector("[data-variant-field='stock']").value || 0)),
-        stripeUrl: row.querySelector("[data-variant-field='stripeUrl']").value.trim(),
         imageIndex,
         image: currentImages[imageIndex] || currentImages[0] || defaultImage,
       };
@@ -191,9 +189,6 @@ function renderVariants() {
           <select data-variant-field="imageIndex">
             ${currentImages.map((_, imageIndex) => `<option value="${imageIndex}" ${imageIndex === Number(variant.imageIndex ?? 0) ? "selected" : ""}>写真${imageIndex + 1}</option>`).join("")}
           </select>
-        </label>
-        <label class="variant-link-field">Stripe購入リンク
-          <input data-variant-field="stripeUrl" value="${escapeHtml(variant.stripeUrl)}" placeholder="https://buy.stripe.com/..." />
         </label>
         <button class="variant-remove" type="button" data-remove-variant="${index}">この色を削除</button>
       </div>
@@ -295,7 +290,7 @@ function readForm() {
     description: document.querySelector("#description").value.trim(),
     image: currentImages[0] || defaultImage,
     images: currentImages,
-    stripeUrl: document.querySelector("#stripeUrl").value.trim(),
+    stripeUrl: "",
     label: document.querySelector("#label").value.trim(),
     visible: document.querySelector("#visible").checked,
     categories,
@@ -316,7 +311,6 @@ function fillForm(product) {
     imageIndex: Math.max(0, currentImages.indexOf(variant.image)),
   })));
   setOptions(normalizeOptions(product));
-  document.querySelector("#stripeUrl").value = product.stripeUrl || "";
   document.querySelector("#label").value = product.label || "";
   document.querySelector("#visible").checked = product.visible !== false;
   setCategories(product.categories || ["new"]);
@@ -476,6 +470,21 @@ async function loadProducts() {
   }
   savePreview();
   renderList();
+}
+
+async function resetProducts() {
+  localStorage.removeItem(storageKey);
+  try {
+    const response = await fetch("./data/products.json", { cache: "no-store" });
+    if (!response.ok) throw new Error("商品データを読み込めませんでした。");
+    products = (await response.json()).map(normalizeProduct);
+  } catch (error) {
+    products = Array.isArray(window.ANDTETE_PRODUCTS) ? JSON.parse(JSON.stringify(window.ANDTETE_PRODUCTS)).map(normalizeProduct) : [];
+  }
+  savePreview();
+  renderList();
+  clearForm();
+  await syncAfterChange("初期データに戻しました。");
 }
 
 function exportProducts() {
@@ -659,7 +668,7 @@ imageThumbs.addEventListener("click", (event) => {
 
 document.querySelector("#addVariant").addEventListener("click", () => {
   currentVariants = collectVariants();
-  currentVariants.push({ name: "", stock: 0, stripeUrl: "", imageIndex: 0, image: currentImages[0] || defaultImage });
+  currentVariants.push({ name: "", stock: 0, imageIndex: 0, image: currentImages[0] || defaultImage });
   renderVariants();
   const rows = variantList.querySelectorAll("[data-variant-row]");
   rows[rows.length - 1]?.querySelector("[data-variant-field='name']")?.focus();
@@ -720,7 +729,7 @@ customCategoryList.addEventListener("click", async (event) => {
   renderCategoryChecks(getCategories().filter((categoryKey) => categoryKey !== key));
   renderCustomCategoryList();
   renderList();
-  await syncAfterChange(`「${category?.label || "追加タブ"}」を削除しました。商品は「すべて」に残っています。`);
+  await syncAfterChange(`「${category?.label || "追加タブ"}」を削除しました。`);
 });
 
 adminFilterTabs.addEventListener("click", (event) => {
@@ -772,6 +781,7 @@ document.querySelector("#addTestProduct").addEventListener("click", async () => 
 });
 
 document.querySelector("#exportProducts").addEventListener("click", exportProducts);
+document.querySelector("#resetProducts").addEventListener("click", resetProducts);
 document.querySelector("#saveSheetUrl").addEventListener("click", saveSheetUrl);
 document.querySelector("#sendToSheet").addEventListener("click", sendToSheet);
 

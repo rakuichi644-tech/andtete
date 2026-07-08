@@ -54,6 +54,9 @@ function doPost(e) {
 }
 
 function doGet(e) {
+  const action = e && e.parameter ? String(e.parameter.action || '') : '';
+  if (action === 'checkout') return createCheckoutResponse_(e);
+
   const data = readProductsFromSheets_();
   const payload = JSON.stringify({
     ok: true,
@@ -68,6 +71,122 @@ function doGet(e) {
       .setMimeType(ContentService.MimeType.JAVASCRIPT);
   }
   return ContentService.createTextOutput(payload).setMimeType(ContentService.MimeType.JSON);
+}
+
+function createCheckoutResponse_(e) {
+  const callback = e && e.parameter ? String(e.parameter.callback || '') : '';
+  const result = createCheckoutSession_(e && e.parameter ? e.parameter : {});
+  const payload = JSON.stringify(result);
+
+  if (/^[A-Za-z_$][0-9A-Za-z_$\.]*$/.test(callback)) {
+    return ContentService.createTextOutput(callback + '(' + payload + ');')
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+  return ContentService.createTextOutput(payload).setMimeType(ContentService.MimeType.JSON);
+}
+
+function createCheckoutSession_(params) {
+  try {
+    const secretKey = PropertiesService.getScriptProperties().getProperty('STRIPE_SECRET_KEY');
+    if (!secretKey) return { ok: false, error: 'Stripe秘密鍵が未設定です。' };
+
+    const productId = String(params.productId || '').trim();
+    const variantName = String(params.variant || '').trim();
+    const optionNames = splitList_(params.options || '');
+    const quantity = Math.max(1, Math.min(20, Number(params.quantity || 1)));
+    const successUrl = safeReturnUrl_(params.successUrl || '');
+    const cancelUrl = safeReturnUrl_(params.cancelUrl || '');
+    const data = readProductsFromSheets_();
+    const product = data.products.find(function(item) {
+      return String(item.id || '') === productId && item.visible !== false;
+    });
+
+    if (!product) return { ok: false, error: '商品が見つかりません。' };
+
+    const variants = Array.isArray(product.variants) ? product.variants : [];
+    const selectedVariant = variantName
+      ? variants.find(function(variant) { return String(variant.name || '') === variantName; })
+      : variants[0];
+    const stock = variants.length ? Number(selectedVariant && selectedVariant.stock || 0) : Number(product.stock || 0);
+    if (variants.length && !selectedVariant) return { ok: false, error: 'カラーが見つかりません。' };
+    if (stock <= 0) return { ok: false, error: '在庫がありません。' };
+
+    const selectedOptions = (Array.isArray(product.options) ? product.options : []).filter(function(option) {
+      return optionNames.indexOf(String(option.name || '')) >= 0;
+    });
+    const optionsTotal = selectedOptions.reduce(function(sum, option) {
+      return sum + Math.max(0, Number(option.priceAdjustment || 0));
+    }, 0);
+    const unitAmount = Math.max(0, Number(product.price || 0)) + optionsTotal;
+    if (unitAmount <= 0) return { ok: false, error: '価格が正しくありません。' };
+
+    const displayName = product.name + (selectedVariant ? ' / ' + selectedVariant.name : '');
+    const descriptionParts = selectedOptions.map(function(option) { return option.name; });
+    const request = {
+      'mode': 'payment',
+      'success_url': successUrl,
+      'cancel_url': cancelUrl,
+      'line_items[0][quantity]': String(quantity),
+      'line_items[0][price_data][currency]': 'jpy',
+      'line_items[0][price_data][product_data][name]': displayName,
+      'line_items[0][price_data][unit_amount]': String(unitAmount),
+      'metadata[product_id]': productId,
+      'metadata[product_name]': product.name,
+      'metadata[variant]': selectedVariant ? selectedVariant.name : '',
+      'metadata[options]': descriptionParts.join(', ')
+    };
+
+    if (descriptionParts.length) {
+      request['line_items[0][price_data][product_data][description]'] = '追加オプション: ' + descriptionParts.join(', ');
+    }
+
+    const response = UrlFetchApp.fetch('https://api.stripe.com/v1/checkout/sessions', {
+      method: 'post',
+      headers: {
+        Authorization: 'Bearer ' + secretKey,
+        'Stripe-Version': '2026-02-25.clover'
+      },
+      payload: request,
+      muteHttpExceptions: true
+    });
+    const code = response.getResponseCode();
+    const body = JSON.parse(response.getContentText() || '{}');
+    if (code < 200 || code >= 300 || !body.url) {
+      return { ok: false, error: body.error && body.error.message ? body.error.message : 'Stripe決済画面を作成できませんでした。' };
+    }
+    return { ok: true, url: body.url };
+  } catch (error) {
+    return { ok: false, error: String(error && error.message ? error.message : error) };
+  }
+}
+
+function setStripeSecretKey() {
+  const secretKey = Browser.inputBox('Stripe秘密鍵を貼り付けてください。sk_live_ または sk_test_ から始まるキーです。');
+  if (!/^sk_(live|test)_/.test(secretKey)) throw new Error('Stripe秘密鍵の形式が正しくありません。');
+  PropertiesService.getScriptProperties().setProperty('STRIPE_SECRET_KEY', secretKey);
+  SpreadsheetApp.getActiveSpreadsheet().toast('Stripe秘密鍵を非公開設定に保存しました。');
+}
+
+function authorizeStripeConnection() {
+  const secretKey = PropertiesService.getScriptProperties().getProperty('STRIPE_SECRET_KEY');
+  if (!secretKey) throw new Error('Stripe秘密鍵が未設定です。');
+  const response = UrlFetchApp.fetch('https://api.stripe.com/v1/account', {
+    method: 'get',
+    headers: {
+      Authorization: 'Bearer ' + secretKey,
+      'Stripe-Version': '2026-02-25.clover'
+    },
+    muteHttpExceptions: true
+  });
+  const code = response.getResponseCode();
+  if (code < 200 || code >= 300) throw new Error('Stripe接続確認に失敗しました: ' + response.getContentText());
+  SpreadsheetApp.getActiveSpreadsheet().toast('Stripe接続を確認しました。');
+}
+
+function safeReturnUrl_(value) {
+  const fallback = 'https://example.com/';
+  const url = String(value || '').trim();
+  return /^https:\/\/[^\s]+$/i.test(url) ? url : fallback;
 }
 
 function writeUnifiedSheet_(products, categories) {

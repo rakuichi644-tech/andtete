@@ -1106,6 +1106,19 @@ h3 {
   width: 100%;
 }
 
+.purchase-checkout:disabled {
+  cursor: wait;
+  opacity: 0.68;
+  transform: none;
+}
+
+.checkout-error {
+  color: #8e2929;
+  font-size: 0.9rem;
+  font-weight: 800;
+  margin: 0.75rem 0 0;
+}
+
 .checkout-note {
   font-size: 0.78rem;
   margin-top: 0.8rem;
@@ -1278,14 +1291,11 @@ h3 {
 }
 
 .custom-category-chip button {
-  background: #fff;
-  border: 1px solid #d8b8ad;
-  border-radius: 999px;
+  background: transparent;
+  border: 0;
   color: #8e2929;
   cursor: pointer;
-  font-size: 0.76rem;
   font-weight: 800;
-  padding: 0.18rem 0.55rem;
 }
 
 .easy-product-card {
