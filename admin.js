@@ -645,6 +645,7 @@ document.querySelector("#clearForm").addEventListener("click", () => {
 });
 
 imageUpload.addEventListener("change", async () => {
+  const selectedCount = imageUpload.files?.length || 0;
   const files = [...(imageUpload.files || [])].slice(0, maxImages);
   if (!files.length) return;
 
@@ -658,7 +659,7 @@ imageUpload.addEventListener("change", async () => {
     const resizedImages = await Promise.all(files.map((file) => resizeImage(file)));
     setImages(resizedImages);
     imageUpload.value = "";
-    const limitedText = imageUpload.files?.length > maxImages ? "8枚目以降は登録されません。" : "";
+    const limitedText = selectedCount > maxImages ? "8枚目以降は登録されません。" : "";
     message(`${resizedImages.length}枚の写真を登録しました。正方形サイズに自動調整済みです。${limitedText}`);
   } catch (error) {
     message("写真を登録できませんでした。別の画像で試してください。");
