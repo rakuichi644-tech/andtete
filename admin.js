@@ -258,7 +258,7 @@ function renderImageThumbs() {
   imageThumbs.innerHTML = currentImages
     .map(
       (image, index) => `
-        <div class="image-thumb-wrap" data-image-drag="${index}" draggable="true">
+        <div class="image-thumb-wrap" data-image-drag="${index}">
           <button class="image-thumb ${index === 0 ? "active" : ""}" type="button" data-image-index="${index}" aria-label="写真${index + 1}をメインにする">
             <img src="${image}" alt="登録写真${index + 1}" />
             <span>${index + 1}</span>
@@ -822,6 +822,40 @@ imageThumbs.addEventListener("pointerup", (event) => {
 imageThumbs.addEventListener("pointercancel", () => {
   imagePointerDrag = null;
   imageThumbs.querySelectorAll(".image-thumb-wrap").forEach((thumb) => thumb.classList.remove("drag-over", "dragging"));
+});
+
+imageThumbs.addEventListener("mousedown", (event) => {
+  const item = event.target.closest("[data-image-drag]");
+  if (!item || event.button !== 0 || imagePointerDrag) return;
+  imagePointerDrag = {
+    from: Number(item.dataset.imageDrag),
+    x: event.clientX,
+    y: event.clientY,
+    active: false,
+  };
+});
+
+window.addEventListener("mousemove", (event) => {
+  if (!imagePointerDrag) return;
+  const distance = Math.hypot(event.clientX - imagePointerDrag.x, event.clientY - imagePointerDrag.y);
+  if (distance > 12) {
+    imagePointerDrag.active = true;
+    suppressImageClick = true;
+  }
+  if (!imagePointerDrag.active) return;
+  event.preventDefault();
+  const item = document.elementFromPoint(event.clientX, event.clientY)?.closest("[data-image-drag]");
+  imageThumbs.querySelectorAll(".image-thumb-wrap").forEach((thumb) => thumb.classList.toggle("drag-over", thumb === item));
+});
+
+window.addEventListener("mouseup", (event) => {
+  if (!imagePointerDrag) return;
+  const target = document.elementFromPoint(event.clientX, event.clientY)?.closest("[data-image-drag]");
+  const from = imagePointerDrag.from;
+  const wasActive = imagePointerDrag.active;
+  imagePointerDrag = null;
+  imageThumbs.querySelectorAll(".image-thumb-wrap").forEach((thumb) => thumb.classList.remove("drag-over", "dragging"));
+  if (wasActive && target) reorderImages(from, Number(target.dataset.imageDrag));
 });
 
 document.querySelector("#addVariant").addEventListener("click", () => {
