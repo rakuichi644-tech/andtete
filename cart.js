@@ -19,8 +19,9 @@ function yen(value) {
 }
 
 function readCart() {
+  const saved = readStoredText(cartStorageKey);
   try {
-    const cart = JSON.parse(localStorage.getItem(cartStorageKey) || "[]");
+    const cart = JSON.parse(saved || "[]");
     return Array.isArray(cart) ? cart : [];
   } catch (error) {
     return [];
@@ -28,7 +29,40 @@ function readCart() {
 }
 
 function writeCart(cart) {
-  localStorage.setItem(cartStorageKey, JSON.stringify(cart));
+  writeStoredText(cartStorageKey, JSON.stringify(cart));
+}
+
+function removeCart() {
+  try {
+    localStorage.removeItem(cartStorageKey);
+  } catch (error) {}
+  try {
+    sessionStorage.removeItem(cartStorageKey);
+  } catch (error) {}
+  document.cookie = `${cartStorageKey}=; path=/andtete; max-age=0; SameSite=Lax`;
+}
+
+function readStoredText(key) {
+  try {
+    const value = localStorage.getItem(key);
+    if (value) return value;
+  } catch (error) {}
+  try {
+    const value = sessionStorage.getItem(key);
+    if (value) return value;
+  } catch (error) {}
+  const cookie = document.cookie.split("; ").find((row) => row.startsWith(`${key}=`));
+  return cookie ? decodeURIComponent(cookie.split("=").slice(1).join("=")) : "";
+}
+
+function writeStoredText(key, value) {
+  try {
+    localStorage.setItem(key, value);
+  } catch (error) {}
+  try {
+    sessionStorage.setItem(key, value);
+  } catch (error) {}
+  document.cookie = `${key}=${encodeURIComponent(value)}; path=/andtete; max-age=2592000; SameSite=Lax`;
 }
 
 function optionText(item) {
@@ -160,6 +194,6 @@ document.querySelector("#cartCheckout").addEventListener("click", async () => {
 });
 
 if (new URLSearchParams(window.location.search).get("paid") === "1") {
-  localStorage.removeItem(cartStorageKey);
+  removeCart();
 }
 renderCart();

@@ -117,8 +117,9 @@ function createCheckoutUrl(params) {
 }
 
 function readCart() {
+  const saved = readStoredText(cartStorageKey);
   try {
-    const cart = JSON.parse(localStorage.getItem(cartStorageKey) || "[]");
+    const cart = JSON.parse(saved || "[]");
     return Array.isArray(cart) ? cart : [];
   } catch (error) {
     return [];
@@ -126,7 +127,30 @@ function readCart() {
 }
 
 function writeCart(cart) {
-  localStorage.setItem(cartStorageKey, JSON.stringify(cart));
+  writeStoredText(cartStorageKey, JSON.stringify(cart));
+}
+
+function readStoredText(key) {
+  try {
+    const value = localStorage.getItem(key);
+    if (value) return value;
+  } catch (error) {}
+  try {
+    const value = sessionStorage.getItem(key);
+    if (value) return value;
+  } catch (error) {}
+  const cookie = document.cookie.split("; ").find((row) => row.startsWith(`${key}=`));
+  return cookie ? decodeURIComponent(cookie.split("=").slice(1).join("=")) : "";
+}
+
+function writeStoredText(key, value) {
+  try {
+    localStorage.setItem(key, value);
+  } catch (error) {}
+  try {
+    sessionStorage.setItem(key, value);
+  } catch (error) {}
+  document.cookie = `${key}=${encodeURIComponent(value)}; path=/andtete; max-age=2592000; SameSite=Lax`;
 }
 
 function selectedPurchaseState(product) {

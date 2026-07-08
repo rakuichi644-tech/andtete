@@ -6,6 +6,7 @@ const categoryLabels = {
 };
 
 const cartStorageKey = "andteteCart";
+let quickCartLastTap = 0;
 
 function formatPrice(price) {
   return `${Number(price).toLocaleString("ja-JP")}円`;
@@ -63,8 +64,9 @@ function purchaseMarkup(productId, stockValue) {
 }
 
 function readCart() {
+  const saved = readStoredText(cartStorageKey);
   try {
-    const cart = JSON.parse(localStorage.getItem(cartStorageKey) || "[]");
+    const cart = JSON.parse(saved || "[]");
     return Array.isArray(cart) ? cart : [];
   } catch (error) {
     return [];
@@ -72,7 +74,30 @@ function readCart() {
 }
 
 function writeCart(cart) {
-  localStorage.setItem(cartStorageKey, JSON.stringify(cart));
+  writeStoredText(cartStorageKey, JSON.stringify(cart));
+}
+
+function readStoredText(key) {
+  try {
+    const value = localStorage.getItem(key);
+    if (value) return value;
+  } catch (error) {}
+  try {
+    const value = sessionStorage.getItem(key);
+    if (value) return value;
+  } catch (error) {}
+  const cookie = document.cookie.split("; ").find((row) => row.startsWith(`${key}=`));
+  return cookie ? decodeURIComponent(cookie.split("=").slice(1).join("=")) : "";
+}
+
+function writeStoredText(key, value) {
+  try {
+    localStorage.setItem(key, value);
+  } catch (error) {}
+  try {
+    sessionStorage.setItem(key, value);
+  } catch (error) {}
+  document.cookie = `${key}=${encodeURIComponent(value)}; path=/andtete; max-age=2592000; SameSite=Lax`;
 }
 
 function addListProductToCart(product, card) {
@@ -299,13 +324,7 @@ document.addEventListener("click", (event) => {
     return;
   }
 
-  const quickCart = event.target.closest("[data-add-card-cart]");
-  if (quickCart) {
-    const card = quickCart.closest(".product-card");
-    const product = allProductsCache.find((item) => String(item.id || "") === String(card?.dataset.productId || ""));
-    if (!product || !card) return;
-    const result = addListProductToCart(product, card);
-    showCartToast(result.ok ? `かごに追加しました。現在${result.count}点入っています。` : result.message);
+  if (handleQuickCartTap(event)) {
     return;
   }
 
@@ -321,6 +340,25 @@ document.addEventListener("click", (event) => {
   }
 
 });
+
+document.addEventListener("touchend", handleQuickCartTap, { passive: false });
+
+function handleQuickCartTap(event) {
+  const quickCart = event.target.closest?.("[data-add-card-cart]");
+  if (!quickCart) return false;
+  const now = Date.now();
+  if (now - quickCartLastTap < 450) return true;
+  quickCartLastTap = now;
+  event.preventDefault?.();
+  event.stopPropagation?.();
+
+  const card = quickCart.closest(".product-card");
+  const product = allProductsCache.find((item) => String(item.id || "") === String(card?.dataset.productId || ""));
+  if (!product || !card) return true;
+  const result = addListProductToCart(product, card);
+  showCartToast(result.ok ? `かごに追加しました。現在${result.count}点入っています。` : result.message);
+  return true;
+}
 
 document.addEventListener("change", (event) => {
   const variantSelect = event.target.closest("[data-variant-select]");
