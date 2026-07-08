@@ -1278,11 +1278,14 @@ h3 {
 }
 
 .custom-category-chip button {
-  background: transparent;
-  border: 0;
+  background: #fff;
+  border: 1px solid #d8b8ad;
+  border-radius: 999px;
   color: #8e2929;
   cursor: pointer;
+  font-size: 0.76rem;
   font-weight: 800;
+  padding: 0.18rem 0.55rem;
 }
 
 .easy-product-card {
