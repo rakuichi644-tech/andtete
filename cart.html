@@ -3,15 +3,15 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>商品を選ぶ | andtete</title>
-    <meta name="description" content="andteteの商品カラーと追加オプションを選ぶページです。" />
+    <title>かご | andtete</title>
+    <meta name="description" content="andteteの商品かご。複数の商品をまとめてStripe決済できます。" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="./styles.css?v=20260708-4" />
   </head>
   <body>
-    <div class="notice">カラーとオプションを選んで、Stripeの安全な決済画面へ進めます</div>
+    <div class="notice">複数の商品をかごに入れて、Stripeでまとめて決済できます</div>
     <header class="site-header" aria-label="サイトヘッダー">
       <div class="brand-group">
         <span class="brand-logo-icon" aria-hidden="true"><img src="./assets/andtete-logo.jpg" alt="" /></span>
@@ -22,16 +22,25 @@
         <a href="./index.html#recommend">おすすめ</a>
         <a href="./index.html#all-products">商品一覧</a>
       </nav>
-      <div class="social-buttons" aria-label="商品操作">
-        <a class="icon-button text-icon" href="./cart.html" aria-label="かごを見る">かご</a>
-        <a class="icon-button text-icon" href="./index.html" aria-label="商品一覧へ戻る">戻る</a>
-      </div>
+      <a class="icon-button text-icon" href="./index.html#all-products" aria-label="商品一覧へ戻る">戻る</a>
     </header>
 
-    <main class="purchase-page">
-      <div id="purchaseProduct" aria-live="polite">
-        <p class="empty-message">商品を読み込んでいます。</p>
-      </div>
+    <main class="cart-page">
+      <section class="page-hero cart-hero">
+        <span class="eyebrow">shopping cart</span>
+        <h1>かご</h1>
+        <p>商品をまとめて確認し、合計金額でStripe決済へ進みます。</p>
+      </section>
+      <section class="cart-layout" aria-label="かごの中身">
+        <div class="cart-items" id="cartItems" aria-live="polite"></div>
+        <aside class="cart-summary-panel">
+          <span class="eyebrow">total</span>
+          <h2>合計</h2>
+          <strong id="cartTotal">0円</strong>
+          <button class="primary-link purchase-checkout" type="button" id="cartCheckout">まとめてStripe決済へ</button>
+          <p class="checkout-note" id="cartStatus" aria-live="polite"></p>
+        </aside>
+      </section>
     </main>
 
     <footer class="site-footer">
@@ -41,6 +50,6 @@
 
     <script src="./site-config.js"></script>
     <script src="./data/products.js"></script>
-    <script src="./product.js?v=20260708-4"></script>
+    <script src="./cart.js?v=20260708-4"></script>
   </body>
 </html>

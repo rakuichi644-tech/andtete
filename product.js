@@ -1,5 +1,6 @@
 const defaultProductImage = "./assets/hero-handmade.png";
 const productSheetUrlKey = "andteteSheetWebhookUrl";
+const cartStorageKey = "andteteCart";
 
 function productSheetUrl() {
   return String(window.ANDTETE_CONFIG?.sheetWebAppUrl || localStorage.getItem(productSheetUrlKey) || "").trim();
@@ -79,17 +80,23 @@ function createCheckoutUrl(params) {
   return new Promise((resolve, reject) => {
     const callbackName = `andteteCheckoutCallback_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
     const script = document.createElement("script");
-    const query = new URLSearchParams({
+    const baseQuery = {
       action: "checkout",
       callback: callbackName,
-      productId: params.productId,
-      variant: params.variant || "",
-      options: (params.options || []).join(","),
-      quantity: "1",
-      successUrl: `${window.location.origin}${window.location.pathname}?id=${encodeURIComponent(params.productId)}&paid=1`,
+      successUrl: new URL("./cart.html?paid=1", window.location.href).href,
       cancelUrl: window.location.href,
       _: String(Date.now()),
-    });
+    };
+    const query = new URLSearchParams(params.cart
+      ? { ...baseQuery, cart: JSON.stringify(params.cart) }
+      : {
+          ...baseQuery,
+          productId: params.productId,
+          variant: params.variant || "",
+          options: (params.options || []).join(","),
+          quantity: "1",
+          successUrl: `${window.location.origin}${window.location.pathname}?id=${encodeURIComponent(params.productId)}&paid=1`,
+        });
     const separator = endpoint.includes("?") ? "&" : "?";
     const timeout = window.setTimeout(() => finish(new Error("決済画面の作成がタイムアウトしました。")), 15000);
 
@@ -107,6 +114,47 @@ function createCheckoutUrl(params) {
     script.src = `${endpoint}${separator}${query.toString()}`;
     document.head.appendChild(script);
   });
+}
+
+function readCart() {
+  try {
+    const cart = JSON.parse(localStorage.getItem(cartStorageKey) || "[]");
+    return Array.isArray(cart) ? cart : [];
+  } catch (error) {
+    return [];
+  }
+}
+
+function writeCart(cart) {
+  localStorage.setItem(cartStorageKey, JSON.stringify(cart));
+}
+
+function selectedPurchaseState(product) {
+  const variantSelect = document.querySelector("[data-purchase-variant]");
+  const selectedVariant = variantSelect?.options[variantSelect.selectedIndex];
+  const checkedOptions = [...document.querySelectorAll("[data-addon-option]:checked")];
+  const options = checkedOptions.map((input) => input.closest(".addon-option")?.querySelector("span")?.textContent.trim() || "").filter(Boolean);
+  const optionTotal = checkedOptions.reduce((sum, input) => sum + Number(input.dataset.addonPrice || 0), 0);
+  return {
+    productId: String(product.id || ""),
+    name: String(product.name || ""),
+    price: Number(product.price || 0) + optionTotal,
+    image: selectedVariant?.dataset.image || productPageImages(product)[0] || defaultProductImage,
+    variant: selectedVariant?.dataset.variantName || "",
+    options,
+    quantity: 1,
+  };
+}
+
+function addCurrentItemToCart(product) {
+  const item = selectedPurchaseState(product);
+  const key = JSON.stringify([item.productId, item.variant, item.options]);
+  const cart = readCart();
+  const existing = cart.find((row) => JSON.stringify([row.productId, row.variant, row.options || []]) === key);
+  if (existing) existing.quantity = Math.min(20, Number(existing.quantity || 1) + 1);
+  else cart.push(item);
+  writeCart(cart);
+  return cart.length;
 }
 
 function renderPurchaseProduct(product) {
@@ -164,6 +212,11 @@ function renderPurchaseProduct(product) {
         </div>
         <p class="purchase-stock" data-purchase-stock>${variants.length ? `残り${Number(firstVariant?.stock ?? 0)}点` : `残り${Number(product.stock ?? 0)}点`}</p>
         <div data-checkout-slot></div>
+        <div class="cart-actions">
+          <button class="primary-link soft-button" type="button" data-add-cart>かごに入れる</button>
+          <a class="text-link" href="./cart.html">かごを見る</a>
+        </div>
+        <p class="cart-status" data-cart-status aria-live="polite"></p>
         <p class="checkout-note">選択内容に合わせてStripeの安全な決済画面を自動作成します。</p>
       </div>
     </section>
@@ -197,21 +250,25 @@ function updatePurchaseState(product) {
 }
 
 document.addEventListener("click", (event) => {
+  const addCartButton = event.target.closest("[data-add-cart]");
+  if (addCartButton) {
+    const count = addCurrentItemToCart(window.ANDTETE_ACTIVE_PRODUCT);
+    const status = document.querySelector("[data-cart-status]");
+    if (status) status.textContent = `かごに入れました。現在${count}種類の商品が入っています。`;
+    return;
+  }
+
   const checkoutButton = event.target.closest("[data-create-checkout]");
   if (checkoutButton) {
     const product = window.ANDTETE_ACTIVE_PRODUCT;
-    const variantSelect = document.querySelector("[data-purchase-variant]");
-    const selectedVariant = variantSelect?.options[variantSelect.selectedIndex]?.dataset.variantName || "";
-    const selectedOptions = [...document.querySelectorAll("[data-addon-option]:checked")].map((input) => {
-      return input.closest(".addon-option")?.querySelector("span")?.textContent.trim() || "";
-    }).filter(Boolean);
+    const selected = selectedPurchaseState(product);
 
     checkoutButton.disabled = true;
     checkoutButton.textContent = "決済画面を作成中";
     createCheckoutUrl({
-      productId: String(product.id || ""),
-      variant: selectedVariant,
-      options: selectedOptions,
+      productId: selected.productId,
+      variant: selected.variant,
+      options: selected.options,
     }).then((url) => {
       window.location.href = url;
     }).catch((error) => {

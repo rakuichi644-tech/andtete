@@ -90,6 +90,8 @@ function createCheckoutSession_(params) {
     const secretKey = PropertiesService.getScriptProperties().getProperty('STRIPE_SECRET_KEY');
     if (!secretKey) return { ok: false, error: 'Stripe秘密鍵が未設定です。' };
 
+    if (params.cart) return createCartCheckoutSession_(params, secretKey);
+
     const productId = String(params.productId || '').trim();
     const variantName = String(params.variant || '').trim();
     const optionNames = splitList_(params.options || '');
@@ -157,6 +159,93 @@ function createCheckoutSession_(params) {
     return { ok: true, url: body.url };
   } catch (error) {
     return { ok: false, error: String(error && error.message ? error.message : error) };
+  }
+}
+
+function createCartCheckoutSession_(params, secretKey) {
+  const successUrl = safeReturnUrl_(params.successUrl || '');
+  const cancelUrl = safeReturnUrl_(params.cancelUrl || '');
+  const cart = parseCart_(params.cart);
+  if (!cart.length) return { ok: false, error: 'かごの中身が空です。' };
+
+  const data = readProductsFromSheets_();
+  const lineItems = [];
+  const metadataNames = [];
+
+  cart.slice(0, 30).forEach(function(item, index) {
+    const product = data.products.find(function(row) {
+      return String(row.id || '') === String(item.productId || '') && row.visible !== false;
+    });
+    if (!product) throw new Error('商品が見つかりません: ' + String(item.productId || ''));
+
+    const variants = Array.isArray(product.variants) ? product.variants : [];
+    const variantName = String(item.variant || '').trim();
+    const selectedVariant = variantName
+      ? variants.find(function(variant) { return String(variant.name || '') === variantName; })
+      : variants[0];
+    if (variants.length && !selectedVariant) throw new Error(product.name + ' のカラーが見つかりません。');
+
+    const stock = variants.length ? Number(selectedVariant.stock || 0) : Number(product.stock || 0);
+    const quantity = Math.max(1, Math.min(20, Number(item.quantity || 1)));
+    if (stock < quantity) throw new Error(product.name + ' の在庫が足りません。');
+
+    const requestedOptions = Array.isArray(item.options) ? item.options.map(String) : splitList_(item.options || '');
+    const selectedOptions = (Array.isArray(product.options) ? product.options : []).filter(function(option) {
+      return requestedOptions.indexOf(String(option.name || '')) >= 0;
+    });
+    const optionTotal = selectedOptions.reduce(function(sum, option) {
+      return sum + Math.max(0, Number(option.priceAdjustment || 0));
+    }, 0);
+    const unitAmount = Math.max(0, Number(product.price || 0)) + optionTotal;
+    if (unitAmount <= 0) throw new Error(product.name + ' の価格が正しくありません。');
+
+    const name = product.name + (selectedVariant ? ' / ' + selectedVariant.name : '');
+    const description = selectedOptions.length ? '追加オプション: ' + selectedOptions.map(function(option) { return option.name; }).join(', ') : '';
+    addLineItem_(lineItems, index, name, unitAmount, quantity, description);
+    metadataNames.push(name + ' x' + quantity);
+  });
+
+  const request = {
+    mode: 'payment',
+    success_url: successUrl,
+    cancel_url: cancelUrl,
+    'metadata[cart_items]': metadataNames.join(' / ').slice(0, 500)
+  };
+  lineItems.forEach(function(entry) {
+    request[entry.key] = entry.value;
+  });
+
+  const response = UrlFetchApp.fetch('https://api.stripe.com/v1/checkout/sessions', {
+    method: 'post',
+    headers: {
+      Authorization: 'Bearer ' + secretKey,
+      'Stripe-Version': '2026-02-25.clover'
+    },
+    payload: request,
+    muteHttpExceptions: true
+  });
+  const code = response.getResponseCode();
+  const body = JSON.parse(response.getContentText() || '{}');
+  if (code < 200 || code >= 300 || !body.url) {
+    return { ok: false, error: body.error && body.error.message ? body.error.message : 'Stripe決済画面を作成できませんでした。' };
+  }
+  return { ok: true, url: body.url };
+}
+
+function addLineItem_(lineItems, index, name, unitAmount, quantity, description) {
+  lineItems.push({ key: 'line_items[' + index + '][quantity]', value: String(quantity) });
+  lineItems.push({ key: 'line_items[' + index + '][price_data][currency]', value: 'jpy' });
+  lineItems.push({ key: 'line_items[' + index + '][price_data][unit_amount]', value: String(unitAmount) });
+  lineItems.push({ key: 'line_items[' + index + '][price_data][product_data][name]', value: name });
+  if (description) lineItems.push({ key: 'line_items[' + index + '][price_data][product_data][description]', value: description });
+}
+
+function parseCart_(value) {
+  try {
+    const parsed = JSON.parse(String(value || '[]'));
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    return [];
   }
 }
 
