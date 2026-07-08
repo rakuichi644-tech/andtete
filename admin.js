@@ -109,7 +109,7 @@ function renderCategoryChecks(selectedCategories = getCategories()) {
 
 function renderCustomCategoryList() {
   customCategoryList.innerHTML = customCategories.length
-    ? customCategories.map((category) => `<span class="custom-category-chip">${escapeHtml(category.label)}<button type="button" data-delete-category="${escapeHtml(category.key)}" aria-label="${escapeHtml(category.label)}を削除">×</button></span>`).join("")
+    ? customCategories.map((category) => `<span class="custom-category-chip"><span>${escapeHtml(category.label)}</span><button type="button" data-delete-category="${escapeHtml(category.key)}" aria-label="${escapeHtml(category.label)}タブを削除">タブを削除</button></span>`).join("")
     : `<span class="empty-message">追加したタブはありません。</span>`;
 }
 
@@ -478,21 +478,6 @@ async function loadProducts() {
   renderList();
 }
 
-async function resetProducts() {
-  localStorage.removeItem(storageKey);
-  try {
-    const response = await fetch("./data/products.json", { cache: "no-store" });
-    if (!response.ok) throw new Error("商品データを読み込めませんでした。");
-    products = (await response.json()).map(normalizeProduct);
-  } catch (error) {
-    products = Array.isArray(window.ANDTETE_PRODUCTS) ? JSON.parse(JSON.stringify(window.ANDTETE_PRODUCTS)).map(normalizeProduct) : [];
-  }
-  savePreview();
-  renderList();
-  clearForm();
-  await syncAfterChange("初期データに戻しました。");
-}
-
 function exportProducts() {
   savePreview();
   const jsonText = `${JSON.stringify(products, null, 2)}\n`;
@@ -735,7 +720,7 @@ customCategoryList.addEventListener("click", async (event) => {
   renderCategoryChecks(getCategories().filter((categoryKey) => categoryKey !== key));
   renderCustomCategoryList();
   renderList();
-  await syncAfterChange(`「${category?.label || "追加タブ"}」を削除しました。`);
+  await syncAfterChange(`「${category?.label || "追加タブ"}」を削除しました。商品は「すべて」に残っています。`);
 });
 
 adminFilterTabs.addEventListener("click", (event) => {
@@ -787,7 +772,6 @@ document.querySelector("#addTestProduct").addEventListener("click", async () => 
 });
 
 document.querySelector("#exportProducts").addEventListener("click", exportProducts);
-document.querySelector("#resetProducts").addEventListener("click", resetProducts);
 document.querySelector("#saveSheetUrl").addEventListener("click", saveSheetUrl);
 document.querySelector("#sendToSheet").addEventListener("click", sendToSheet);
 
