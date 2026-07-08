@@ -786,7 +786,7 @@ imageThumbs.addEventListener("dragend", () => {
 
 imageThumbs.addEventListener("pointerdown", (event) => {
   const item = event.target.closest("[data-image-drag]");
-  if (!item || event.pointerType === "mouse") return;
+  if (!item) return;
   imagePointerDrag = {
     from: Number(item.dataset.imageDrag),
     x: event.clientX,
@@ -797,7 +797,7 @@ imageThumbs.addEventListener("pointerdown", (event) => {
 });
 
 imageThumbs.addEventListener("pointermove", (event) => {
-  if (!imagePointerDrag || event.pointerType === "mouse") return;
+  if (!imagePointerDrag) return;
   const distance = Math.hypot(event.clientX - imagePointerDrag.x, event.clientY - imagePointerDrag.y);
   if (distance > 12) {
     imagePointerDrag.active = true;
@@ -810,7 +810,7 @@ imageThumbs.addEventListener("pointermove", (event) => {
 });
 
 imageThumbs.addEventListener("pointerup", (event) => {
-  if (!imagePointerDrag || event.pointerType === "mouse") return;
+  if (!imagePointerDrag) return;
   const target = document.elementFromPoint(event.clientX, event.clientY)?.closest("[data-image-drag]");
   const from = imagePointerDrag.from;
   const wasActive = imagePointerDrag.active;
