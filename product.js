@@ -192,10 +192,10 @@ function renderPurchaseProduct(product) {
   container.innerHTML = `
     <section class="purchase-layout" data-purchase-card data-base-price="${Number(product.price || 0)}">
       <div class="purchase-gallery">
-        <img class="purchase-main-image" src="${escapeProductHtml(initialImage)}" alt="${escapeProductHtml(product.name)}" />
+        <img class="purchase-main-image" src="${escapeProductHtml(initialImage)}" alt="${escapeProductHtml(product.name)}" decoding="async" />
         ${images.length > 1 ? `<div class="purchase-thumbs">${images.map((image, index) => `
           <button class="${index === 0 ? "active" : ""}" type="button" data-purchase-thumb="${index}" aria-label="写真${index + 1}を表示">
-            <img src="${escapeProductHtml(image)}" alt="" />
+            <img src="${escapeProductHtml(image)}" alt="" loading="lazy" decoding="async" />
           </button>`).join("")}</div>` : ""}
       </div>
 

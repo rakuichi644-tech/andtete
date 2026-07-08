@@ -706,7 +706,7 @@ function loadImage(file) {
 
 async function resizeImage(file) {
   const image = await loadImage(file);
-  const size = 800;
+  const size = 720;
   const canvas = document.createElement("canvas");
   const context = canvas.getContext("2d");
   const cropSize = Math.min(image.naturalWidth, image.naturalHeight);
@@ -719,7 +719,7 @@ async function resizeImage(file) {
   context.fillRect(0, 0, size, size);
   context.drawImage(image, sx, sy, cropSize, cropSize, 0, 0, size, size);
 
-  return canvas.toDataURL("image/jpeg", 0.82);
+  return canvas.toDataURL("image/jpeg", 0.72);
 }
 
 form.addEventListener("submit", async (event) => {

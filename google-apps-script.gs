@@ -618,7 +618,7 @@ function isUsableImageValue_(value) {
 }
 
 function driveImageUrl_(id) {
-  return 'https://drive.google.com/thumbnail?id=' + encodeURIComponent(id) + '&sz=w2000';
+  return 'https://drive.google.com/thumbnail?id=' + encodeURIComponent(id) + '&sz=w900';
 }
 
 function getImageFolder_() {

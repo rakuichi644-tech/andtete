@@ -88,7 +88,7 @@ function renderCart() {
   container.innerHTML = items.length
     ? items.map((item, index) => `
       <article class="cart-item">
-        <img src="${escapeCartHtml(item.image || "./assets/hero-handmade.png")}" alt="${escapeCartHtml(item.name)}" />
+        <img src="${escapeCartHtml(item.image || "./assets/hero-handmade.png")}" alt="${escapeCartHtml(item.name)}" loading="lazy" decoding="async" />
         <div>
           <h2>${escapeCartHtml(item.name)}</h2>
           <p>${escapeCartHtml(optionText(item) || "通常商品")}</p>

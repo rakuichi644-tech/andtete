@@ -155,7 +155,7 @@ function productCard(product) {
           .map(
             (thumb, index) => `
               <button class="${index === 0 ? "active" : ""}" type="button" data-product-thumb="${index}" aria-label="写真${index + 1}を表示">
-                <img src="${escapeHtml(thumb)}" alt="" loading="lazy" />
+                <img src="${escapeHtml(thumb)}" alt="" loading="lazy" decoding="async" />
               </button>
             `
           )
@@ -183,7 +183,7 @@ function productCard(product) {
   return `
     <article class="product-card" data-product-id="${escapeHtml(product.id)}">
       <div class="product-media">
-        <img class="product-main-image" src="${escapeHtml(firstVariant?.image || image)}" alt="${escapeHtml(product.name)}" loading="lazy" />
+        <img class="product-main-image" src="${escapeHtml(firstVariant?.image || image)}" alt="${escapeHtml(product.name)}" loading="lazy" decoding="async" />
         <span class="badge">${escapeHtml(label)}</span>
       </div>
       ${thumbs}
