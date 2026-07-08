@@ -14,6 +14,13 @@ function escapeCartHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
+function optimizeCartImageUrl(value) {
+  const url = String(value || "").trim();
+  if (!url.includes("drive.google.com/thumbnail")) return url;
+  const id = url.match(/[?&]id=([A-Za-z0-9_-]+)/)?.[1];
+  return id ? `https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w900` : url.replace(/([?&]sz=)w\\d+/i, "$1w900");
+}
+
 function yen(value) {
   return `${Number(value || 0).toLocaleString("ja-JP")}円`;
 }
@@ -88,7 +95,7 @@ function renderCart() {
   container.innerHTML = items.length
     ? items.map((item, index) => `
       <article class="cart-item">
-        <img src="${escapeCartHtml(item.image || "./assets/hero-handmade.png")}" alt="${escapeCartHtml(item.name)}" loading="lazy" decoding="async" />
+        <img src="${escapeCartHtml(optimizeCartImageUrl(item.image || "./assets/hero-handmade.png"))}" alt="${escapeCartHtml(item.name)}" loading="lazy" decoding="async" />
         <div>
           <h2>${escapeCartHtml(item.name)}</h2>
           <p>${escapeCartHtml(optionText(item) || "通常商品")}</p>

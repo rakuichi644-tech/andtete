@@ -21,10 +21,17 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
+function optimizeImageUrl(value) {
+  const url = String(value || "").trim();
+  if (!url.includes("drive.google.com/thumbnail")) return url;
+  const id = url.match(/[?&]id=([A-Za-z0-9_-]+)/)?.[1];
+  return id ? `https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w900` : url.replace(/([?&]sz=)w\\d+/i, "$1w900");
+}
+
 function productImages(product) {
   const baseImages = Array.isArray(product.images) && product.images.length ? product.images : [product.image || "./assets/hero-handmade.png"];
   const variantImages = productVariants(product).map((variant) => variant.image).filter(Boolean);
-  return [...new Set([...baseImages, ...variantImages])].filter(Boolean).slice(0, 7);
+  return [...new Set([...baseImages, ...variantImages].map(optimizeImageUrl))].filter(Boolean).slice(0, 7);
 }
 
 function productVariants(product) {
@@ -34,7 +41,7 @@ function productVariants(product) {
         .map((variant) => ({
           name: String(variant.name || "").trim(),
           stock: variant.stock === "" || variant.stock == null ? product.stock : Number(variant.stock),
-          image: String(variant.image || "").trim(),
+          image: optimizeImageUrl(variant.image),
         }))
     : [];
 }
@@ -107,7 +114,7 @@ function addListProductToCart(product, card) {
   const stock = Number(selectedVariant?.dataset.stock || product.stock || 0);
   if (stock <= 0) return { ok: false, message: "在庫がありません。" };
 
-  const image = selectedVariant?.dataset.image || card?.querySelector(".product-main-image")?.currentSrc || card?.querySelector(".product-main-image")?.src || productImages(product)[0] || "./assets/hero-handmade.png";
+  const image = optimizeImageUrl(selectedVariant?.dataset.image || card?.querySelector(".product-main-image")?.currentSrc || card?.querySelector(".product-main-image")?.src || productImages(product)[0] || "./assets/hero-handmade.png");
   const item = {
     productId: String(product.id || ""),
     name: String(product.name || ""),

@@ -44,10 +44,17 @@ function escapeProductHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
+function optimizeProductImageUrl(value) {
+  const url = String(value || "").trim();
+  if (!url.includes("drive.google.com/thumbnail")) return url;
+  const id = url.match(/[?&]id=([A-Za-z0-9_-]+)/)?.[1];
+  return id ? `https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w900` : url.replace(/([?&]sz=)w\\d+/i, "$1w900");
+}
+
 function productPageImages(product) {
   const images = Array.isArray(product.images) && product.images.length ? product.images : [product.image || defaultProductImage];
   const variantImages = (product.variants || []).map((variant) => variant.image).filter(Boolean);
-  return [...new Set([...images, ...variantImages])].filter(Boolean).slice(0, 7);
+  return [...new Set([...images, ...variantImages].map(optimizeProductImageUrl))].filter(Boolean).slice(0, 7);
 }
 
 function productPageVariants(product) {
@@ -163,7 +170,7 @@ function selectedPurchaseState(product) {
     productId: String(product.id || ""),
     name: String(product.name || ""),
     price: Number(product.price || 0) + optionTotal,
-    image: selectedVariant?.dataset.image || productPageImages(product)[0] || defaultProductImage,
+    image: optimizeProductImageUrl(selectedVariant?.dataset.image || productPageImages(product)[0] || defaultProductImage),
     variant: selectedVariant?.dataset.variantName || "",
     options,
     quantity: 1,
