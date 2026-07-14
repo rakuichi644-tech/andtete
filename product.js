@@ -363,7 +363,15 @@ async function loadPurchaseProduct() {
     }
   }
 
-  const product = products.find((item) => String(item.id) === String(id) && item.visible !== false);
+  let product = products.find((item) => String(item.id) === String(id) && item.visible !== false);
+  if (!product && previewProducts) {
+    try {
+      const previewList = JSON.parse(previewProducts);
+      product = previewList.find((item) => String(item.id) === String(id) && item.visible !== false);
+    } catch (error) {
+      console.warn("ブラウザ内の商品データを読み込めませんでした。", error);
+    }
+  }
   if (!product) {
     document.querySelector("#purchaseProduct").innerHTML = `<section class="page-hero"><h1>商品が見つかりません</h1><a class="primary-link" href="./index.html#all-products">商品一覧へ戻る</a></section>`;
     return;

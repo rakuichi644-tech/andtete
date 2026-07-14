@@ -5,21 +5,11 @@ const categoryNames = {
   stock: "即納商品",
 };
 
-const imageNames = {
-  "./assets/item-green-bag.png": "かごバッグ グリーン",
-  "./assets/item-natural-bag.png": "かごバッグ ナチュラル",
-  "./assets/item-candles.png": "キャンドル",
-  "./assets/item-cups.png": "マグカップ",
-  "./assets/item-flowers.png": "花のトレイ",
-  "./assets/item-linen.png": "リネンクロス",
-  "./assets/item-plate.png": "小皿",
-};
-
 const storageKey = "andteteProductsPreview";
 const sheetUrlKey = "andteteSheetWebhookUrl";
 const sheetTokenKey = "andteteSheetSyncToken";
 const customCategoryStorageKey = "andteteCustomCategories";
-const defaultImage = "./assets/item-green-bag.png";
+const defaultImage = "";
 const form = document.querySelector("#productForm");
 const productList = document.querySelector("#productList");
 const adminStatus = document.querySelector("#adminStatus");
@@ -28,8 +18,8 @@ const sheetWebhookUrl = document.querySelector("#sheetWebhookUrl");
 const sheetSyncToken = document.querySelector("#sheetSyncToken");
 const imageInput = document.querySelector("#image");
 const imagePreview = document.querySelector("#imagePreview");
+const imagePreviewEmpty = document.querySelector("#imagePreviewEmpty");
 const imageUpload = document.querySelector("#imageUpload");
-const imagePreset = document.querySelector("#imagePreset");
 const imageThumbs = document.querySelector("#imageThumbs");
 const variantList = document.querySelector("#variantList");
 const optionList = document.querySelector("#optionList");
@@ -43,7 +33,7 @@ const adminPageSize = 10;
 
 let products = [];
 let editingId = "";
-let currentImages = [defaultImage];
+let currentImages = [];
 let currentVariants = [];
 let currentOptions = [];
 let customCategories = [];
@@ -159,7 +149,7 @@ function setCategories(categories) {
 function clearForm() {
   editingId = "";
   form.reset();
-  setImages([defaultImage]);
+  setImages([]);
   setVariants([]);
   setOptions([]);
   document.querySelector("#stock").value = 1;
@@ -264,15 +254,16 @@ function renderOptions() {
 }
 
 function normalizeImages(product) {
-  const images = Array.isArray(product?.images) && product.images.length ? product.images : [product?.image || defaultImage];
+  const images = Array.isArray(product?.images) && product.images.length ? product.images : [product?.image || ""];
   return images.filter(Boolean).slice(0, maxImages);
 }
 
 function setImages(values) {
-  currentImages = (values?.length ? values : [defaultImage]).filter(Boolean).slice(0, maxImages);
-  imageInput.value = currentImages[0] || defaultImage;
-  imagePreview.src = currentImages[0] || defaultImage;
-  imagePreset.value = currentImages.length === 1 && imageNames[currentImages[0]] ? currentImages[0] : "";
+  currentImages = (values || []).filter(Boolean).slice(0, maxImages);
+  imageInput.value = currentImages[0] || "";
+  imagePreview.src = currentImages[0] || "";
+  imagePreview.hidden = !currentImages.length;
+  imagePreviewEmpty.hidden = Boolean(currentImages.length);
   renderImageThumbs();
   if (variantList) renderVariants();
 }
@@ -282,6 +273,7 @@ function renderImageThumbs() {
     .map(
       (image, index) => `
         <div class="image-thumb-wrap" data-image-drag="${index}">
+          <button class="image-remove" type="button" data-remove-image="${index}" aria-label="写真${index + 1}を削除">×</button>
           <button class="image-thumb ${index === 0 ? "active" : ""}" type="button" data-image-index="${index}" aria-label="写真${index + 1}をメインにする">
             <img src="${image}" alt="登録写真${index + 1}" />
             <span>${index + 1}</span>
@@ -290,6 +282,16 @@ function renderImageThumbs() {
       `
     )
     .join("");
+}
+
+function removeImage(index) {
+  if (index < 0 || index >= currentImages.length) return;
+  currentVariants = collectVariants().map((variant) => ({
+    ...variant,
+    imageIndex: variant.imageIndex === index ? 0 : Math.max(0, variant.imageIndex - (variant.imageIndex > index ? 1 : 0)),
+  }));
+  setImages(currentImages.filter((_, imageIndex) => imageIndex !== index));
+  message(`写真${index + 1}を削除しました。`);
 }
 
 function reorderImages(fromIndex, toIndex) {
@@ -315,6 +317,11 @@ function readForm() {
     return null;
   }
 
+  if (!currentImages.length) {
+    message("商品写真を1枚以上登録してください。");
+    return null;
+  }
+
   const variants = collectVariants();
   const options = collectOptions();
   const totalStock = variants.length ? variants.reduce((sum, variant) => sum + variant.stock, 0) : Number(document.querySelector("#stock").value || 0);
@@ -325,7 +332,7 @@ function readForm() {
     price: Number(document.querySelector("#price").value || 0),
     stock: totalStock,
     description: document.querySelector("#description").value.trim(),
-    image: currentImages[0] || defaultImage,
+    image: currentImages[0],
     images: currentImages,
     stripeUrl: "",
     label: document.querySelector("#label").value.trim(),
@@ -561,16 +568,32 @@ function wait(ms) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
-function remoteHasExpectedProducts(remote, expectedIds) {
-  const remoteIds = remote.products.map((product) => String(product.id || ""));
-  return expectedIds.every((id) => remoteIds.includes(id));
+function comparableProduct(product) {
+  return {
+    id: String(product.id || ""),
+    name: String(product.name || ""),
+    price: Number(product.price || 0),
+    stock: Number(product.stock || 0),
+    description: String(product.description || ""),
+    label: String(product.label || ""),
+    visible: product.visible !== false,
+    categories: [...(product.categories || [])].map(String).sort(),
+    variants: normalizeVariants(product).map(({ name, stock }) => ({ name, stock: Number(stock || 0) })),
+    options: normalizeOptions(product).map(({ name, priceAdjustment }) => ({ name, priceAdjustment: Number(priceAdjustment || 0) })),
+  };
 }
 
-async function waitForSheetReflection(url, expectedIds) {
+function remoteMatchesExpectedProducts(remote, expectedProducts) {
+  const actual = remote.products.map(comparableProduct).sort((a, b) => a.id.localeCompare(b.id));
+  const expected = expectedProducts.map(comparableProduct).sort((a, b) => a.id.localeCompare(b.id));
+  return JSON.stringify(actual) === JSON.stringify(expected);
+}
+
+async function waitForSheetReflection(url, expectedProducts) {
   for (let attempt = 0; attempt < 10; attempt += 1) {
     await wait(attempt === 0 ? 2500 : 3500);
     const remote = await loadRemoteProductData(url);
-    if (remoteHasExpectedProducts(remote, expectedIds)) return remote;
+    if (remoteMatchesExpectedProducts(remote, expectedProducts)) return remote;
   }
   return null;
 }
@@ -641,7 +664,7 @@ async function sendToSheet(silent = false, successText = "スプシとHPへ同�
   savePreview();
   const url = String(sheetWebhookUrl.value || window.ANDTETE_CONFIG?.sheetWebAppUrl || "").trim();
   const token = String(sheetSyncToken.value || loadLocalText(sheetTokenKey) || "").trim();
-  const expectedIds = products.map((product) => String(product.id || ""));
+  const expectedProducts = products.map((product) => ({ ...product }));
   const payload = { token, products, categories: customCategories };
 
   if (!url.startsWith("https://script.google.com/")) {
@@ -657,11 +680,11 @@ async function sendToSheet(silent = false, successText = "スプシとHPへ同�
   try {
     message("スプシ・HPへ同期中です。スマホ回線では1分ほどかかる場合があります。");
     await postSheetWithFetch(url, payload);
-    let remote = await waitForSheetReflection(url, expectedIds);
+    let remote = await waitForSheetReflection(url, expectedProducts);
 
     if (!remote) {
       await postSheetWithForm(url, payload);
-      remote = await waitForSheetReflection(url, expectedIds);
+      remote = await waitForSheetReflection(url, expectedProducts);
     }
 
     if (!remote) {
@@ -767,15 +790,15 @@ imageUpload.addEventListener("change", async () => {
   }
 });
 
-imagePreset.addEventListener("change", () => {
-  if (!imagePreset.value) return;
-  setImages([imagePreset.value]);
-  message("サンプル写真を設定しました。");
-});
-
 imageThumbs.addEventListener("click", (event) => {
   if (suppressImageClick) {
     suppressImageClick = false;
+    return;
+  }
+
+  const removeButton = event.target.closest("[data-remove-image]");
+  if (removeButton) {
+    removeImage(Number(removeButton.dataset.removeImage));
     return;
   }
 
@@ -980,31 +1003,6 @@ optionList.addEventListener("click", (event) => {
   if (!button) return;
   currentOptions = collectOptions().filter((_, index) => index !== Number(button.dataset.removeOption));
   renderOptions();
-});
-
-document.querySelector("#addTestProduct").addEventListener("click", async () => {
-  const suffix = products.filter((product) => product.id.startsWith("test-item")).length + 1;
-  products.push({
-    id: `test-item-${String(suffix).padStart(3, "0")}`,
-    name: "テスト商品",
-    price: 1234,
-    stock: 5,
-    description: "商品追加の練習用です。あとで削除できます。",
-    image: "./assets/item-candles.png",
-    images: ["./assets/item-candles.png", "./assets/item-flowers.png", "./assets/item-plate.png"],
-    stripeUrl: "",
-    options: [
-      { name: "ギフト包装", priceAdjustment: 500 },
-      { name: "名入れ", priceAdjustment: 800 },
-    ],
-    label: "TEST",
-    visible: true,
-    categories: ["new", "recommend"],
-  });
-  savePreview();
-  activeAdminPage = Math.max(1, Math.ceil(products.length / adminPageSize));
-  renderList();
-  await syncAfterChange("テスト商品を追加しました。");
 });
 
 document.querySelector("#exportProducts").addEventListener("click", exportProducts);

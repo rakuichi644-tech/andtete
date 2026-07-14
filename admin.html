@@ -58,21 +58,12 @@
           </label>
           <label class="span-2">商品写真
             <div class="image-uploader">
-              <img id="imagePreview" src="./assets/item-green-bag.png" alt="商品写真プレビュー" />
+              <div class="image-preview-empty" id="imagePreviewEmpty">写真を選択してください</div>
+              <img id="imagePreview" src="" alt="商品写真プレビュー" hidden />
               <div>
                 <input id="imageUpload" type="file" accept="image/*" multiple />
                 <small>最大7枚まで選べます。どんな画角でも、商品一覧に合う正方形サイズへ自動調整します。1枚目がメイン写真になります。</small>
-                <select id="imagePreset" aria-label="サンプル写真を選ぶ">
-                  <option value="">サンプル写真から選ぶ</option>
-                  <option value="./assets/item-green-bag.png">かごバッグ グリーン</option>
-                  <option value="./assets/item-natural-bag.png">かごバッグ ナチュラル</option>
-                  <option value="./assets/item-candles.png">キャンドル</option>
-                  <option value="./assets/item-cups.png">マグカップ</option>
-                  <option value="./assets/item-flowers.png">花のトレイ</option>
-                  <option value="./assets/item-linen.png">リネンクロス</option>
-                  <option value="./assets/item-plate.png">小皿</option>
-                </select>
-                <input id="image" type="hidden" value="./assets/item-green-bag.png" />
+                <input id="image" type="hidden" value="" />
                 <div class="image-thumbs" id="imageThumbs" aria-label="登録写真一覧"></div>
               </div>
             </div>
@@ -81,7 +72,7 @@
             <input id="label" placeholder="例: NEW / 予約 / おすすめ" />
           </label>
           <label class="span-2">商品説明
-            <textarea id="description" placeholder="商品の特徴やお知らせを書きます"></textarea>
+            <textarea id="description" rows="12" placeholder="商品の特徴やお知らせを書きます"></textarea>
           </label>
           <fieldset class="span-2 easy-fieldset variant-fieldset">
             <legend>カラーバリエーション</legend>
@@ -109,7 +100,6 @@
 
           <div class="span-2 easy-actions">
             <button class="primary-link" type="submit" id="saveProduct">この商品を保存</button>
-            <button class="primary-link soft-button" type="button" id="addTestProduct">テスト商品を入れる</button>
           </div>
         </form>
         <p class="admin-status" id="adminStatus" aria-live="polite"></p>
