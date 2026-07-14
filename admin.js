@@ -20,6 +20,7 @@ const imageInput = document.querySelector("#image");
 const imagePreview = document.querySelector("#imagePreview");
 const imagePreviewEmpty = document.querySelector("#imagePreviewEmpty");
 const imageUpload = document.querySelector("#imageUpload");
+const imageAddUpload = document.querySelector("#imageAddUpload");
 const imageThumbs = document.querySelector("#imageThumbs");
 const variantList = document.querySelector("#variantList");
 const optionList = document.querySelector("#optionList");
@@ -768,32 +769,43 @@ document.querySelector("#clearForm").addEventListener("click", () => {
   message("入力欄を空にしました。");
 });
 
-imageUpload.addEventListener("change", async () => {
-  const file = imageUpload.files?.[0];
-  if (!file) return;
+async function addImageFiles(files, input) {
+  const selectedFiles = Array.from(files || []);
+  if (!selectedFiles.length) return;
 
-  if (!file.type.startsWith("image/")) {
+  if (selectedFiles.some((file) => !file.type.startsWith("image/"))) {
     message("画像ファイルを選んでください。");
-    imageUpload.value = "";
+    input.value = "";
     return;
   }
 
-  if (currentImages.length >= maxImages) {
+  const remaining = maxImages - currentImages.length;
+  if (remaining <= 0) {
     message("写真は最大7枚まで登録できます。不要な写真を削除してから追加してください。");
-    imageUpload.value = "";
+    input.value = "";
     return;
   }
 
-  message("写真を自動調整しています。少し待ってください。");
+  const acceptedFiles = selectedFiles.slice(0, remaining);
+  message(`${acceptedFiles.length}枚の写真を自動調整しています。少し待ってください。`);
   try {
-    const resizedImage = await resizeImage(file);
-    setImages([...currentImages, resizedImage]);
-    imageUpload.value = "";
-    message(`写真${currentImages.length}枚目を追加しました。正方形サイズに自動調整済みです。`);
+    const resizedImages = await Promise.all(acceptedFiles.map((file) => resizeImage(file)));
+    setImages([...currentImages, ...resizedImages]);
+    const limitedText = selectedFiles.length > remaining ? ` 最大7枚のため、最初の${remaining}枚を追加しました。` : "";
+    message(`${resizedImages.length}枚の写真を追加しました（合計${currentImages.length}枚）。${limitedText}`);
   } catch (error) {
-    imageUpload.value = "";
     message("写真を登録できませんでした。別の画像で試してください。");
+  } finally {
+    input.value = "";
   }
+}
+
+imageUpload.addEventListener("change", async () => {
+  await addImageFiles(imageUpload.files, imageUpload);
+});
+
+imageAddUpload.addEventListener("change", async () => {
+  await addImageFiles(imageAddUpload.files, imageAddUpload);
 });
 
 // スマートフォンではドラッグ判定より先に削除し、×の1タップで即時反映する。

@@ -979,6 +979,32 @@ h3 {
   background: #f7f1e9;
 }
 
+.image-upload-actions {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-bottom: 0.65rem;
+}
+
+.image-upload-actions > div {
+  background: #f7f1e9;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.75rem;
+}
+
+.image-upload-actions strong {
+  display: block;
+  font-size: 0.85rem;
+  margin-bottom: 0.4rem;
+}
+
+@media (max-width: 640px) {
+  .image-upload-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
 .easy-fieldset {
   border: 1px solid var(--line);
   border-radius: 8px;

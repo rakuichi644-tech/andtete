@@ -61,8 +61,17 @@
               <div class="image-preview-empty" id="imagePreviewEmpty">写真を選択してください</div>
               <img id="imagePreview" src="" alt="商品写真プレビュー" hidden />
               <div>
-                <input id="imageUpload" type="file" accept="image/*" />
-                <small>写真は1枚ずつ追加できます（最大7枚）。どんな画角でも、商品一覧に合う正方形サイズへ自動調整します。1枚目がメイン写真になります。</small>
+                <div class="image-upload-actions">
+                  <div>
+                    <strong>写真をまとめて追加</strong>
+                    <input id="imageUpload" type="file" accept="image/*" multiple />
+                  </div>
+                  <div>
+                    <strong>写真を1枚追加</strong>
+                    <input id="imageAddUpload" type="file" accept="image/*" />
+                  </div>
+                </div>
+                <small>合計7枚まで追加できます。間違えた写真は×で削除し、「写真を1枚追加」から補充できます。1枚目がメイン写真になります。</small>
                 <input id="image" type="hidden" value="" />
                 <div class="image-thumbs" id="imageThumbs" aria-label="登録写真一覧"></div>
               </div>
