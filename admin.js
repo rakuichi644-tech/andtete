@@ -769,26 +769,45 @@ document.querySelector("#clearForm").addEventListener("click", () => {
 });
 
 imageUpload.addEventListener("change", async () => {
-  const selectedCount = imageUpload.files?.length || 0;
-  const files = [...(imageUpload.files || [])].slice(0, maxImages);
-  if (!files.length) return;
+  const file = imageUpload.files?.[0];
+  if (!file) return;
 
-  if (files.some((file) => !file.type.startsWith("image/"))) {
+  if (!file.type.startsWith("image/")) {
     message("画像ファイルを選んでください。");
+    imageUpload.value = "";
     return;
   }
 
-  message(`${files.length}枚の写真を自動調整しています。少し待ってください。`);
-  try {
-    const resizedImages = await Promise.all(files.map((file) => resizeImage(file)));
-    setImages(resizedImages);
+  if (currentImages.length >= maxImages) {
+    message("写真は最大7枚まで登録できます。不要な写真を削除してから追加してください。");
     imageUpload.value = "";
-    const limitedText = selectedCount > maxImages ? "8枚目以降は登録されません。" : "";
-    message(`${resizedImages.length}枚の写真を登録しました。正方形サイズに自動調整済みです。${limitedText}`);
+    return;
+  }
+
+  message("写真を自動調整しています。少し待ってください。");
+  try {
+    const resizedImage = await resizeImage(file);
+    setImages([...currentImages, resizedImage]);
+    imageUpload.value = "";
+    message(`写真${currentImages.length}枚目を追加しました。正方形サイズに自動調整済みです。`);
   } catch (error) {
+    imageUpload.value = "";
     message("写真を登録できませんでした。別の画像で試してください。");
   }
 });
+
+// スマートフォンではドラッグ判定より先に削除し、×の1タップで即時反映する。
+imageThumbs.addEventListener(
+  "pointerdown",
+  (event) => {
+    const removeButton = event.target.closest("[data-remove-image]");
+    if (!removeButton) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    removeImage(Number(removeButton.dataset.removeImage));
+  },
+  true
+);
 
 imageThumbs.addEventListener("click", (event) => {
   if (suppressImageClick) {
@@ -843,6 +862,7 @@ imageThumbs.addEventListener("dragend", () => {
 });
 
 imageThumbs.addEventListener("pointerdown", (event) => {
+  if (event.target.closest("[data-remove-image]")) return;
   const item = event.target.closest("[data-image-drag]");
   if (!item) return;
   imagePointerDrag = {
