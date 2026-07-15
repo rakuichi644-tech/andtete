@@ -7,6 +7,7 @@ const SETTINGS_SHEET = '設定';
 const DATA_SHEET = 'HP商品データ';
 const IMAGE_FOLDER_NAME = 'andtete商品画像';
 const JSON_CHUNK_SIZE = 45000;
+const ORDER_SHEET = '注文管理';
 
 function setupProject() {
   const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
@@ -16,6 +17,7 @@ function setupProject() {
   const unifiedSheet = ensureSheet_(UNIFIED_SHEET, unifiedHeaders_());
   ensureSheet_(CATEGORY_SHEET, categoryHeaders_());
   ensureSheet_(DATA_SHEET, ['JSON']);
+  ensureSheet_(ORDER_SHEET, orderHeaders_());
 
   if (unifiedSheet.getLastRow() < 2) migrateLegacySheets_();
   hideLegacySheets_();
@@ -80,6 +82,8 @@ function decodeFormBody_(body) {
 function doGet(e) {
   const action = e && e.parameter ? String(e.parameter.action || '') : '';
   if (action === 'checkout') return createCheckoutResponse_(e);
+  if (action === 'confirmOrder') return confirmOrderResponse_(e);
+  if (action === 'orders') return orderListResponse_(e);
 
   const data = readProductsFromSheets_();
   const payload = JSON.stringify({
@@ -120,7 +124,7 @@ function createCheckoutSession_(params) {
     const variantName = String(params.variant || '').trim();
     const optionNames = splitList_(params.options || '');
     const quantity = Math.max(1, Math.min(20, Number(params.quantity || 1)));
-    const successUrl = safeReturnUrl_(params.successUrl || '');
+    const successUrl = checkoutSuccessUrl_(params.successUrl || '');
     const cancelUrl = safeReturnUrl_(params.cancelUrl || '');
     const data = readProductsFromSheets_();
     const product = data.products.find(function(item) {
@@ -152,6 +156,11 @@ function createCheckoutSession_(params) {
       'mode': 'payment',
       'success_url': successUrl,
       'cancel_url': cancelUrl,
+      'locale': 'ja',
+      'customer_creation': 'always',
+      'billing_address_collection': 'required',
+      'phone_number_collection[enabled]': 'true',
+      'shipping_address_collection[allowed_countries][0]': 'JP',
       'line_items[0][quantity]': String(quantity),
       'line_items[0][price_data][currency]': 'jpy',
       'line_items[0][price_data][product_data][name]': displayName,
@@ -159,7 +168,9 @@ function createCheckoutSession_(params) {
       'metadata[product_id]': productId,
       'metadata[product_name]': product.name,
       'metadata[variant]': selectedVariant ? selectedVariant.name : '',
-      'metadata[options]': descriptionParts.join(', ')
+      'metadata[options]': descriptionParts.join(', '),
+      'metadata[quantity]': String(quantity),
+      'metadata[order_type]': 'single'
     };
 
     if (descriptionParts.length) {
@@ -187,7 +198,7 @@ function createCheckoutSession_(params) {
 }
 
 function createCartCheckoutSession_(params, secretKey) {
-  const successUrl = safeReturnUrl_(params.successUrl || '');
+  const successUrl = checkoutSuccessUrl_(params.successUrl || '');
   const cancelUrl = safeReturnUrl_(params.cancelUrl || '');
   const cart = parseCart_(params.cart);
   if (!cart.length) return { ok: false, error: 'かごの中身が空です。' };
@@ -233,8 +244,22 @@ function createCartCheckoutSession_(params, secretKey) {
     mode: 'payment',
     success_url: successUrl,
     cancel_url: cancelUrl,
-    'metadata[cart_items]': metadataNames.join(' / ').slice(0, 500)
+    locale: 'ja',
+    customer_creation: 'always',
+    billing_address_collection: 'required',
+    'phone_number_collection[enabled]': 'true',
+    'shipping_address_collection[allowed_countries][0]': 'JP',
+    'metadata[cart_items]': metadataNames.join(' / ').slice(0, 500),
+    'metadata[order_type]': 'cart'
   };
+  cart.slice(0, 30).forEach(function(item, index) {
+    request['metadata[cart_' + index + ']'] = JSON.stringify({
+      id: String(item.productId || ''),
+      variant: String(item.variant || ''),
+      options: Array.isArray(item.options) ? item.options.map(String) : splitList_(item.options || ''),
+      quantity: Math.max(1, Math.min(20, Number(item.quantity || 1)))
+    }).slice(0, 500);
+  });
   lineItems.forEach(function(entry) {
     request[entry.key] = entry.value;
   });
@@ -300,6 +325,130 @@ function safeReturnUrl_(value) {
   const fallback = 'https://example.com/';
   const url = String(value || '').trim();
   return /^https:\/\/[^\s]+$/i.test(url) ? url : fallback;
+}
+
+function checkoutSuccessUrl_(value) {
+  const url = safeReturnUrl_(value);
+  const separator = url.indexOf('?') >= 0 ? '&' : '?';
+  return url + separator + 'session_id={CHECKOUT_SESSION_ID}';
+}
+
+function confirmOrderResponse_(e) {
+  const callback = e && e.parameter ? String(e.parameter.callback || '') : '';
+  const sessionId = e && e.parameter ? String(e.parameter.sessionId || '').trim() : '';
+  const result = confirmPaidOrder_(sessionId);
+  const payload = JSON.stringify(result);
+  if (/^[A-Za-z_$][0-9A-Za-z_$\.]*$/.test(callback)) {
+    return ContentService.createTextOutput(callback + '(' + payload + ');').setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+  return ContentService.createTextOutput(payload).setMimeType(ContentService.MimeType.JSON);
+}
+
+function confirmPaidOrder_(sessionId) {
+  if (!/^cs_(test_|live_)?[A-Za-z0-9_]+$/.test(sessionId)) return { ok: false, error: '注文番号が正しくありません。' };
+  const secretKey = PropertiesService.getScriptProperties().getProperty('STRIPE_SECRET_KEY');
+  if (!secretKey) return { ok: false, error: 'Stripe秘密鍵が未設定です。' };
+  const response = UrlFetchApp.fetch('https://api.stripe.com/v1/checkout/sessions/' + encodeURIComponent(sessionId) + '?expand[]=line_items', {
+    method: 'get',
+    headers: { Authorization: 'Bearer ' + secretKey, 'Stripe-Version': '2026-02-25.clover' },
+    muteHttpExceptions: true
+  });
+  const session = JSON.parse(response.getContentText() || '{}');
+  if (response.getResponseCode() < 200 || response.getResponseCode() >= 300) return { ok: false, error: '決済情報を確認できませんでした。' };
+  if (String(session.payment_status || '') !== 'paid') return { ok: false, error: '決済完了を確認できませんでした。' };
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const sheet = ensureSheet_(ORDER_SHEET, orderHeaders_());
+    const rows = sheet.getDataRange().getValues();
+    const existing = rows.slice(1).some(function(row) { return String(row[1] || '') === sessionId; });
+    if (existing) return { ok: true, alreadySaved: true, orderId: sessionId };
+
+    const details = session.customer_details || {};
+    const shipping = (session.collected_information && session.collected_information.shipping_details) || session.shipping_details || {};
+    const address = shipping.address || details.address || {};
+    const lineItems = session.line_items && Array.isArray(session.line_items.data) ? session.line_items.data : [];
+    const itemText = lineItems.map(function(item) {
+      return String(item.description || '') + ' × ' + Number(item.quantity || 1);
+    }).join('\n');
+    const shippingAddress = formatAddress_(shipping.name || details.name || '', address);
+    const now = new Date();
+    sheet.appendRow([
+      now, sessionId, details.name || shipping.name || '', details.email || '', details.phone || '',
+      shippingAddress, itemText, Number(session.amount_total || 0), String(session.currency || 'jpy').toUpperCase(),
+      '支払済み', '未発送', '', new Date(Number(session.created || 0) * 1000), new Date()
+    ]);
+    applyPaidStock_(session.metadata || {});
+    sendOrderEmails_(sessionId, details, shippingAddress, itemText, Number(session.amount_total || 0));
+    return { ok: true, orderId: sessionId };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function applyPaidStock_(metadata) {
+  const data = readProductsFromSheets_();
+  const products = data.products;
+  const items = [];
+  if (String(metadata.order_type || '') === 'single') {
+    items.push({ id: metadata.product_id, variant: metadata.variant || '', quantity: Number(metadata.quantity || 1) });
+  } else {
+    Object.keys(metadata).filter(function(key) { return /^cart_\d+$/.test(key); }).sort().forEach(function(key) {
+      try { items.push(JSON.parse(metadata[key])); } catch (error) {}
+    });
+  }
+  items.forEach(function(item) {
+    const product = products.find(function(row) { return String(row.id || '') === String(item.id || ''); });
+    if (!product) return;
+    const quantity = Math.max(1, Number(item.quantity || 1));
+    if (Array.isArray(product.variants) && product.variants.length) {
+      product.variants = product.variants.map(function(variant) {
+        return String(variant.name || '') === String(item.variant || '') ? Object.assign({}, variant, { stock: Math.max(0, Number(variant.stock || 0) - quantity) }) : variant;
+      });
+      product.stock = product.variants.reduce(function(sum, variant) { return sum + Number(variant.stock || 0); }, 0);
+    } else {
+      product.stock = Math.max(0, Number(product.stock || 0) - quantity);
+    }
+  });
+  writeUnifiedSheet_(products, data.categories);
+  writeHiddenData_({ products: products, categories: data.categories });
+}
+
+function formatAddress_(name, address) {
+  return [name, '〒' + String(address.postal_code || ''), address.state || '', address.city || '', address.line1 || '', address.line2 || '', address.country || ''].filter(Boolean).join(' ');
+}
+
+function sendOrderEmails_(sessionId, details, address, items, total) {
+  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  const owner = spreadsheet.getOwner();
+  const adminEmail = PropertiesService.getScriptProperties().getProperty('ORDER_ADMIN_EMAIL') || (owner && owner.getEmail()) || '';
+  const customerEmail = String(details.email || '');
+  const summary = '注文番号：' + sessionId + '\nお名前：' + String(details.name || '') + '\n電話番号：' + String(details.phone || '') + '\n配送先：' + address + '\n商品：\n' + items + '\n合計：¥' + Number(total || 0).toLocaleString('ja-JP');
+  if (adminEmail) MailApp.sendEmail(adminEmail, '【andtete】新しい注文が入りました', '新しい注文が入りました。\n\n' + summary + '\n\n注文管理シートをご確認ください。');
+  if (customerEmail) MailApp.sendEmail(customerEmail, '【andtete】ご注文ありがとうございます', String(details.name || '') + '様\n\nご注文ありがとうございます。決済が完了しました。\n\n' + summary + '\n\n発送準備が整いましたら改めてご案内いたします。');
+}
+
+function orderListResponse_(e) {
+  const callback = e && e.parameter ? String(e.parameter.callback || '') : '';
+  const token = e && e.parameter ? String(e.parameter.token || '') : '';
+  const expectedToken = getWriteToken_();
+  const result = token && expectedToken && token === expectedToken ? { ok: true, orders: readOrders_() } : { ok: false, error: '管理用同期キーが正しくありません。' };
+  const payload = JSON.stringify(result);
+  if (/^[A-Za-z_$][0-9A-Za-z_$\.]*$/.test(callback)) return ContentService.createTextOutput(callback + '(' + payload + ');').setMimeType(ContentService.MimeType.JAVASCRIPT);
+  return ContentService.createTextOutput(payload).setMimeType(ContentService.MimeType.JSON);
+}
+
+function readOrders_() {
+  const sheet = ensureSheet_(ORDER_SHEET, orderHeaders_());
+  if (sheet.getLastRow() < 2) return [];
+  return sheet.getRange(2, 1, sheet.getLastRow() - 1, orderHeaders_().length).getValues().map(function(row) {
+    return { orderedAt: row[0], orderId: row[1], name: row[2], email: row[3], phone: row[4], address: row[5], items: row[6], total: row[7], paymentStatus: row[9], shippingStatus: row[10] };
+  }).reverse();
+}
+
+function orderHeaders_() {
+  return ['注文日時', 'Stripe注文ID', 'お名前', 'メールアドレス', '電話番号', '配送先住所', '注文商品', '合計金額', '通貨', '決済状況', '発送状況', '追跡番号', 'Stripe作成日時', '最終更新'];
 }
 
 function writeUnifiedSheet_(products, categories) {

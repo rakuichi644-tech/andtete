@@ -161,12 +161,24 @@
         </label>
       </section>
 
+      <section class="admin-panel" aria-labelledby="orders-title">
+        <span class="eyebrow">orders</span>
+        <h2 id="orders-title">注文・顧客情報</h2>
+        <p>Stripeで決済が完了した注文だけを表示します。氏名、連絡先、配送先、購入商品、金額を確認できます。</p>
+        <div class="easy-actions">
+          <button class="primary-link soft-button" type="button" id="refreshOrders">注文を更新</button>
+        </div>
+        <div id="orderList" class="easy-product-list" aria-live="polite">
+          <p>注文情報を読み込んでいます。</p>
+        </div>
+      </section>
+
       <section class="admin-panel sheet-panel" aria-labelledby="sheet-title">
         <span class="eyebrow">Google Sheets</span>
         <h2 id="sheet-title">スプシ・HPへ自動反映</h2>
         <p>
-          Google Apps ScriptのURLを一度入れると、商品を保存・変更・削除するたびに自動送信します。
-          HPも最新の商品、在庫、カラー、オプション、画像を自動取得します。
+          URLと管理用同期キーは最初の1回だけ保存してください。その後は商品を保存・変更・削除するたびに自動反映し、失敗した場合もこの画面を開いている間は自動で再送します。
+          通常は手動同期ボタンを押す必要はありません。
         </p>
         <ol class="sync-steps">
           <li>Googleスプレッドシートを1つ作る</li>
@@ -182,7 +194,7 @@
         </label>
         <div class="easy-actions">
           <button class="primary-link" type="button" id="saveSheetUrl">連携URLを保存</button>
-          <button class="primary-link soft-button" type="button" id="sendToSheet">今すぐ同期</button>
+          <button class="primary-link soft-button" type="button" id="sendToSheet">再同期する</button>
           <a class="text-link" href="./google-apps-script.gs" target="_blank" rel="noreferrer">貼り付け用コードを見る</a>
         </div>
       </section>

@@ -383,3 +383,27 @@ async function loadPurchaseProduct() {
 }
 
 loadPurchaseProduct();
+
+function confirmProductOrder() {
+  const params = new URLSearchParams(window.location.search);
+  const sessionId = params.get("session_id");
+  if (params.get("paid") !== "1" || !sessionId) return;
+  const endpoint = productSheetUrl();
+  const callbackName = `andteteProductOrderConfirm_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+  const script = document.createElement("script");
+  const separator = endpoint.includes("?") ? "&" : "?";
+  const show = (text) => {
+    const main = document.querySelector("#purchaseProduct");
+    if (main) main.insertAdjacentHTML("afterbegin", `<p class="checkout-note" role="status">${escapeProductHtml(text)}</p>`);
+  };
+  window[callbackName] = (payload) => {
+    script.remove();
+    delete window[callbackName];
+    show(payload?.ok ? "ご注文ありがとうございます。注文内容をメールでお送りしました。" : (payload?.error || "注文情報の保存確認に失敗しました。お問い合わせください。"));
+  };
+  script.onerror = () => window[callbackName]({ ok: false });
+  script.src = `${endpoint}${separator}${new URLSearchParams({ action: "confirmOrder", callback: callbackName, sessionId, _: String(Date.now()) })}`;
+  document.head.appendChild(script);
+}
+
+confirmProductOrder();

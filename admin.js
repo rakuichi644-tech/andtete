@@ -9,6 +9,7 @@ const storageKey = "andteteProductsPreview";
 const sheetUrlKey = "andteteSheetWebhookUrl";
 const sheetTokenKey = "andteteSheetSyncToken";
 const customCategoryStorageKey = "andteteCustomCategories";
+const pendingSyncKey = "andtetePendingSheetSync";
 const defaultImage = "";
 const form = document.querySelector("#productForm");
 const productList = document.querySelector("#productList");
@@ -29,6 +30,7 @@ const customCategoryList = document.querySelector("#customCategoryList");
 const adminFilterTabs = document.querySelector("#adminFilterTabs");
 const adminPagination = document.querySelector("#adminPagination");
 const adminProductCount = document.querySelector("#adminProductCount");
+const orderList = document.querySelector("#orderList");
 const maxImages = 7;
 const adminPageSize = 10;
 
@@ -693,6 +695,7 @@ async function sendToSheet(silent = false, successText = "スプシとHPへ同�
       return false;
     }
     applyRemoteProductData(remote);
+    localStorage.removeItem(pendingSyncKey);
     message(successText);
     return true;
   } catch (error) {
@@ -702,6 +705,7 @@ async function sendToSheet(silent = false, successText = "スプシとHPへ同�
 }
 
 async function syncAfterChange(localText) {
+  localStorage.setItem(pendingSyncKey, "1");
   const token = String(sheetSyncToken.value || loadLocalText(sheetTokenKey) || "").trim();
   if (!token) {
     message(`${localText} ただし、このスマホでは管理用同期キーが未設定のため、スプシ・HPにはまだ反映されていません。下の「管理用同期キー」を一度入力してください。`);
@@ -710,6 +714,51 @@ async function syncAfterChange(localText) {
   }
   const synced = await sendToSheet(true, `${localText} スプシとHPにも自動同期しました。`);
   if (!synced) message(`${localText} このブラウザのHPには自動反映されます。全端末への反映にはApps Script URLの設定が必要です。`);
+}
+
+function loadRemoteOrders() {
+  const url = adminSheetDataUrl();
+  const token = String(sheetSyncToken.value || loadLocalText(sheetTokenKey) || "").trim();
+  if (!url.startsWith("https://script.google.com/") || !token) return Promise.reject(new Error("連携設定が必要です。"));
+  return new Promise((resolve, reject) => {
+    const callbackName = `andteteOrders_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+    const script = document.createElement("script");
+    const separator = url.includes("?") ? "&" : "?";
+    const timeout = window.setTimeout(() => finish(new Error("注文情報の取得がタイムアウトしました。")), 20000);
+    function finish(error, payload) {
+      window.clearTimeout(timeout);
+      script.remove();
+      delete window[callbackName];
+      if (error) reject(error); else if (payload?.ok) resolve(payload.orders || []); else reject(new Error(payload?.error || "注文情報を取得できませんでした。"));
+    }
+    window[callbackName] = (payload) => finish(null, payload);
+    script.onerror = () => finish(new Error("注文情報を取得できませんでした。"));
+    script.src = `${url}${separator}${new URLSearchParams({ action: "orders", callback: callbackName, token, _: String(Date.now()) })}`;
+    document.head.appendChild(script);
+  });
+}
+
+function escapeOrderHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
+}
+
+async function refreshOrders() {
+  if (!orderList) return;
+  orderList.innerHTML = "<p>注文情報を読み込んでいます。</p>";
+  try {
+    const orders = await loadRemoteOrders();
+    orderList.innerHTML = orders.length ? orders.map((order) => `
+      <article class="easy-product-card">
+        <div class="easy-product-copy">
+          <span class="product-card-label">${escapeOrderHtml(order.paymentStatus || "支払済み")} / ${escapeOrderHtml(order.shippingStatus || "未発送")}</span>
+          <h3>${escapeOrderHtml(order.name || "お名前未取得")} 様</h3>
+          <p>${escapeOrderHtml(order.items || "").replace(/\n/g, "<br>")}</p>
+          <p><strong>合計：</strong>¥${Number(order.total || 0).toLocaleString("ja-JP")}<br><strong>メール：</strong>${escapeOrderHtml(order.email)}<br><strong>電話：</strong>${escapeOrderHtml(order.phone)}<br><strong>配送先：</strong>${escapeOrderHtml(order.address)}<br><strong>注文ID：</strong>${escapeOrderHtml(order.orderId)}</p>
+        </div>
+      </article>`).join("") : "<p>決済完了済みの注文はまだありません。</p>";
+  } catch (error) {
+    orderList.innerHTML = `<p>${escapeOrderHtml(error.message || "注文情報を取得できませんでした。")}</p>`;
+  }
 }
 
 function loadImage(file) {
@@ -1041,6 +1090,7 @@ document.querySelector("#exportProducts").addEventListener("click", exportProduc
 document.querySelector("#resetProducts").addEventListener("click", resetProducts);
 document.querySelector("#saveSheetUrl").addEventListener("click", saveSheetUrl);
 document.querySelector("#sendToSheet").addEventListener("click", sendToSheet);
+document.querySelector("#refreshOrders")?.addEventListener("click", refreshOrders);
 
 productList.addEventListener("click", async (event) => {
   const editId = event.target.closest("[data-edit]")?.dataset.edit;
@@ -1077,6 +1127,12 @@ clearForm();
 sheetWebhookUrl.value = loadLocalText(sheetUrlKey) || window.ANDTETE_CONFIG?.sheetWebAppUrl || "";
 sheetSyncToken.value = loadLocalText(sheetTokenKey) || "";
 loadProducts();
+refreshOrders();
 
 window.addEventListener("focus", () => refreshProductsFromSheet(false));
 window.setInterval(() => refreshProductsFromSheet(false), Math.max(15000, Number(window.ANDTETE_CONFIG?.refreshIntervalMs || 30000)));
+window.setInterval(() => {
+  const token = String(sheetSyncToken.value || loadLocalText(sheetTokenKey) || "").trim();
+  if (localStorage.getItem(pendingSyncKey) === "1" && token) sendToSheet(true, "未反映の商品を自動で再同期しました。");
+}, 60000);
+window.setInterval(refreshOrders, 60000);
