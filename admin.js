@@ -6,20 +6,18 @@ const categoryNames = {
 };
 
 const imageNames = {
-  "./assets/item-green-bag.png": "かごバッグ グリーン",
-  "./assets/item-natural-bag.png": "かごバッグ ナチュラル",
-  "./assets/item-candles.png": "キャンドル",
-  "./assets/item-cups.png": "マグカップ",
-  "./assets/item-flowers.png": "花のトレイ",
-  "./assets/item-linen.png": "リネンクロス",
-  "./assets/item-plate.png": "小皿",
+  "./assets/editorial/gallery-01.jpg": "サンプル写真 1",
+  "./assets/editorial/gallery-03.jpg": "サンプル写真 2",
+  "./assets/editorial/gallery-04.jpg": "サンプル写真 3",
+  "./assets/editorial/gallery-05.jpg": "サンプル写真 4",
+  "./assets/editorial/gallery-08.jpg": "サンプル写真 5",
 };
 
 const storageKey = "andteteProductsPreview";
 const sheetUrlKey = "andteteSheetWebhookUrl";
 const sheetTokenKey = "andteteSheetSyncToken";
 const customCategoryStorageKey = "andteteCustomCategories";
-const defaultImage = "./assets/item-green-bag.png";
+const defaultImage = "./assets/editorial/gallery-01.jpg";
 const form = document.querySelector("#productForm");
 const productList = document.querySelector("#productList");
 const adminStatus = document.querySelector("#adminStatus");
@@ -988,8 +986,8 @@ document.querySelector("#addTestProduct").addEventListener("click", async () => 
     price: 1234,
     stock: 5,
     description: "商品追加の練習用です。あとで削除できます。",
-    image: "./assets/item-candles.png",
-    images: ["./assets/item-candles.png", "./assets/item-flowers.png", "./assets/item-plate.png"],
+    image: "./assets/editorial/gallery-03.jpg",
+    images: ["./assets/editorial/gallery-03.jpg", "./assets/editorial/gallery-04.jpg", "./assets/editorial/gallery-05.jpg"],
     stripeUrl: "",
     options: [
       { name: "ギフト包装", priceAdjustment: 500 },

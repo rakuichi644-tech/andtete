@@ -11,7 +11,7 @@
       href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Noto+Sans+JP:wght@400;500;700&family=Noto+Serif+JP:wght@400;500;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./styles.css?v=20260717-08" />
+    <link rel="stylesheet" href="./styles.css?v=20260717-09" />
   </head>
   <body class="admin-body">
     <main class="admin-shell easy-admin">
@@ -58,21 +58,19 @@
           </label>
           <label class="span-2">商品写真
             <div class="image-uploader">
-              <img id="imagePreview" src="./assets/item-green-bag.png" alt="商品写真プレビュー" />
+              <img id="imagePreview" src="./assets/editorial/gallery-01.jpg" alt="商品写真プレビュー" />
               <div>
                 <input id="imageUpload" type="file" accept="image/*" multiple />
                 <small>最大7枚まで選べます。どんな画角でも、商品一覧に合う正方形サイズへ自動調整します。1枚目がメイン写真になります。</small>
                 <select id="imagePreset" aria-label="サンプル写真を選ぶ">
                   <option value="">サンプル写真から選ぶ</option>
-                  <option value="./assets/item-green-bag.png">かごバッグ グリーン</option>
-                  <option value="./assets/item-natural-bag.png">かごバッグ ナチュラル</option>
-                  <option value="./assets/item-candles.png">キャンドル</option>
-                  <option value="./assets/item-cups.png">マグカップ</option>
-                  <option value="./assets/item-flowers.png">花のトレイ</option>
-                  <option value="./assets/item-linen.png">リネンクロス</option>
-                  <option value="./assets/item-plate.png">小皿</option>
+                  <option value="./assets/editorial/gallery-01.jpg">サンプル写真 1</option>
+                  <option value="./assets/editorial/gallery-03.jpg">サンプル写真 2</option>
+                  <option value="./assets/editorial/gallery-04.jpg">サンプル写真 3</option>
+                  <option value="./assets/editorial/gallery-05.jpg">サンプル写真 4</option>
+                  <option value="./assets/editorial/gallery-08.jpg">サンプル写真 5</option>
                 </select>
-                <input id="image" type="hidden" value="./assets/item-green-bag.png" />
+                <input id="image" type="hidden" value="./assets/editorial/gallery-01.jpg" />
                 <div class="image-thumbs" id="imageThumbs" aria-label="登録写真一覧"></div>
               </div>
             </div>
@@ -186,6 +184,6 @@
 
     <script src="./site-config.js"></script>
     <script src="./data/products.js"></script>
-    <script src="./admin.js?v=20260717-08"></script>
+    <script src="./admin.js?v=20260717-09"></script>
   </body>
 </html>
