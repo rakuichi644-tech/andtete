@@ -3280,3 +3280,24 @@ h2 {
   top: 50%;
   transform: translate(-50%, -50%);
 }
+
+/* Desktop cart badge visibility fix */
+.product-section,
+.home-body .product-grid[data-products],
+.list-grid {
+  overflow: visible;
+}
+
+.product-slider {
+  overflow-x: auto;
+}
+
+.product-slider,
+.home-body .product-grid[data-products],
+.list-grid {
+  padding-top: 18px;
+}
+
+.product-slider {
+  margin-top: -18px;
+}
