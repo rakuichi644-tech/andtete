@@ -9,7 +9,7 @@ const cartStorageKey = "andteteCart";
 let quickCartLastTap = 0;
 
 function formatPrice(price) {
-  return `${Number(price).toLocaleString("ja-JP")}円`;
+  return `¥${Number(price).toLocaleString("ja-JP")}`;
 }
 
 function escapeHtml(value) {
@@ -183,7 +183,7 @@ function productCard(product) {
 }
 
 let allProductsCache = [];
-let activeListCategory = "new";
+let activeListCategory = "all";
 let activeGridSize = localStorage.getItem("andteteListGridSize") || "3";
 const productsStorageKey = "andteteProductsPreview";
 const sheetUrlStorageKey = "andteteSheetWebhookUrl";
@@ -201,13 +201,14 @@ function renderCustomerCategoryTabs(categories = customerCustomCategories) {
   const container = document.querySelector("#customerCategoryTabs");
   if (!container) return;
   const tabs = [
+    { key: "all", label: "すべて" },
     { key: "new", label: "NEW ARRIVALS" },
     { key: "recommend", label: "おすすめ" },
     { key: "preorder", label: "予約商品" },
     { key: "stock", label: "即納商品" },
     ...customerCustomCategories,
   ];
-  if (!tabs.some((tab) => tab.key === activeListCategory)) activeListCategory = "new";
+  if (!tabs.some((tab) => tab.key === activeListCategory)) activeListCategory = "all";
   container.innerHTML = tabs
     .map((tab) => `<button class="${tab.key === activeListCategory ? "active" : ""}" type="button" data-list-tab="${escapeHtml(tab.key)}" role="tab" aria-selected="${tab.key === activeListCategory}">${escapeHtml(tab.label)}</button>`)
     .join("");
@@ -273,7 +274,7 @@ function renderListProducts(category) {
   if (!container) return;
   activeListCategory = category;
   container.dataset.gridSize = activeGridSize;
-  const items = allProductsCache.filter((product) => product.visible !== false && product.categories?.includes(category));
+  const items = allProductsCache.filter((product) => product.visible !== false && (category === "all" || product.categories?.includes(category)));
   container.innerHTML = items.length
     ? items.map(productCard).join("")
     : `<p class="empty-message">現在掲載中の商品はありません。</p>`;

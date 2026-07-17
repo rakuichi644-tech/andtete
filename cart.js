@@ -22,7 +22,7 @@ function optimizeCartImageUrl(value) {
 }
 
 function yen(value) {
-  return `${Number(value || 0).toLocaleString("ja-JP")}円`;
+  return `¥${Number(value || 0).toLocaleString("ja-JP")}`;
 }
 
 function readCart() {

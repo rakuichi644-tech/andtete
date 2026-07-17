@@ -14,7 +14,7 @@
       href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Noto+Sans+JP:wght@400;500;700&family=Noto+Serif+JP:wght@400;500;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./styles.css?v=20260717-03" />
+    <link rel="stylesheet" href="./styles.css?v=20260717-04" />
   </head>
   <body class="home-body">
     <div class="notice">TikTokライブ販売 月・水・金 21:30 START / Stripe決済対応</div>
@@ -88,6 +88,11 @@
         <a class="primary-link" href="https://www.tiktok.com/@andtetehm?_r=1&_t=ZS-97pC7jdKUJJ" target="_blank" rel="noreferrer">TikTokを見る</a>
       </section>
 
+      <section class="photo-band" aria-label="andteteの世界観">
+        <img src="./assets/editorial/band-01.jpg" alt="ハンドメイドアイテムを身につけた子どもたち" loading="lazy" decoding="async" />
+        <p>small handmade pieces for everyday joy.</p>
+      </section>
+
       <section class="product-section" id="new-arrivals" aria-labelledby="new-title">
         <div class="section-head">
           <div>
@@ -105,6 +110,11 @@
           </div>
         </div>
         <div class="product-slider" data-products="new" data-slider="new" tabindex="0" aria-label="新商品一覧"></div>
+      </section>
+
+      <section class="photo-band photo-band-alt" aria-label="季節のおすすめ">
+        <img src="./assets/editorial/band-02.jpg" alt="手編みクラウンを身につける子ども" loading="lazy" decoding="async" />
+        <p>soft textures, tiny details, made with care.</p>
       </section>
 
       <section class="product-section alt" id="recommend" aria-labelledby="recommend-title">
@@ -126,6 +136,11 @@
         <div class="product-slider" data-products="recommend" data-slider="recommend" tabindex="0" aria-label="おすすめ商品一覧"></div>
       </section>
 
+      <section class="photo-band" aria-label="親子時間に寄り添う作品">
+        <img src="./assets/editorial/band-03.jpg" alt="ハンドメイドアイテムと親子時間" loading="lazy" decoding="async" />
+        <p>for family days and little celebrations.</p>
+      </section>
+
       <section class="product-section list-tabs-section" id="all-products" aria-labelledby="all-products-title">
         <div class="section-head">
           <div>
@@ -133,7 +148,8 @@
             <h2 id="all-products-title">商品一覧</h2>
           </div>
           <div class="list-tabs customer-category-tabs" id="customerCategoryTabs" role="tablist" aria-label="商品一覧の切り替え">
-            <button class="active" type="button" data-list-tab="new" role="tab" aria-selected="true">NEW ARRIVALS</button>
+            <button class="active" type="button" data-list-tab="all" role="tab" aria-selected="true">すべて</button>
+            <button type="button" data-list-tab="new" role="tab" aria-selected="false">NEW ARRIVALS</button>
             <button type="button" data-list-tab="recommend" role="tab" aria-selected="false">おすすめ</button>
             <button type="button" data-list-tab="preorder" role="tab" aria-selected="false">予約商品</button>
             <button type="button" data-list-tab="stock" role="tab" aria-selected="false">即納商品</button>
@@ -148,6 +164,11 @@
           </div>
         </div>
         <div class="product-grid list-grid" data-list-products aria-live="polite"></div>
+      </section>
+
+      <section class="photo-band photo-band-alt" aria-label="日常を彩る小物">
+        <img src="./assets/editorial/band-04.jpg" alt="繊細なハンドメイドアクセサリー" loading="lazy" decoding="async" />
+        <p>crafted accents for gentle moments.</p>
       </section>
 
       <section class="product-section" id="preorder" aria-labelledby="preorder-title">
@@ -175,6 +196,22 @@
         <div class="product-grid" data-products="stock" aria-label="即納商品一覧"></div>
       </section>
 
+      <section class="gallery-section" aria-labelledby="gallery-title">
+        <span class="eyebrow">gallery</span>
+        <h2 id="gallery-title">andtete gallery</h2>
+        <div class="gallery-grid" aria-hidden="true">
+          <img src="./assets/editorial/gallery-01.jpg" alt="" loading="lazy" decoding="async" />
+          <img src="./assets/editorial/gallery-02.jpg" alt="" loading="lazy" decoding="async" />
+          <img src="./assets/editorial/gallery-03.jpg" alt="" loading="lazy" decoding="async" />
+          <img src="./assets/editorial/gallery-04.jpg" alt="" loading="lazy" decoding="async" />
+          <img src="./assets/editorial/gallery-05.jpg" alt="" loading="lazy" decoding="async" />
+          <img src="./assets/editorial/gallery-06.jpg" alt="" loading="lazy" decoding="async" />
+          <img src="./assets/editorial/gallery-07.jpg" alt="" loading="lazy" decoding="async" />
+          <img src="./assets/editorial/gallery-08.jpg" alt="" loading="lazy" decoding="async" />
+          <img src="./assets/editorial/gallery-09.jpg" alt="" loading="lazy" decoding="async" />
+        </div>
+      </section>
+
       <section class="contact-panel" aria-labelledby="contact-title">
         <span class="eyebrow">contact</span>
         <h2 id="contact-title">お問い合わせは公式LINEへ</h2>
@@ -194,6 +231,6 @@
     <script src="./site-config.js"></script>
     <script src="./data/products.js"></script>
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
-    <script src="./script.js?v=20260717-03"></script>
+    <script src="./script.js?v=20260717-04"></script>
   </body>
 </html>

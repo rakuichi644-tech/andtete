@@ -75,7 +75,7 @@ function productPageOptions(product) {
 }
 
 function formatProductPrice(price) {
-  return `${Number(price || 0).toLocaleString("ja-JP")}円`;
+  return `¥${Number(price || 0).toLocaleString("ja-JP")}`;
 }
 
 function createCheckoutUrl(params) {
