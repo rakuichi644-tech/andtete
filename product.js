@@ -337,6 +337,24 @@ document.addEventListener("error", (event) => {
   image.src = defaultProductImage;
 }, true);
 
+function setupProductMenuToggle() {
+  document.querySelectorAll(".site-header").forEach((header) => {
+    const button = header.querySelector("[data-menu-toggle]");
+    const nav = header.querySelector(".nav");
+    if (!button || !nav) return;
+    button.addEventListener("click", () => {
+      const open = !header.classList.contains("menu-open");
+      header.classList.toggle("menu-open", open);
+      button.setAttribute("aria-expanded", String(open));
+    });
+    nav.addEventListener("click", (event) => {
+      if (!event.target.closest("a")) return;
+      header.classList.remove("menu-open");
+      button.setAttribute("aria-expanded", "false");
+    });
+  });
+}
+
 async function loadPurchaseProduct() {
   const id = new URLSearchParams(window.location.search).get("id");
   let products = [];
@@ -363,15 +381,7 @@ async function loadPurchaseProduct() {
     }
   }
 
-  let product = products.find((item) => String(item.id) === String(id) && item.visible !== false);
-  if (!product && previewProducts) {
-    try {
-      const previewList = JSON.parse(previewProducts);
-      product = previewList.find((item) => String(item.id) === String(id) && item.visible !== false);
-    } catch (error) {
-      console.warn("ブラウザ内の商品データを読み込めませんでした。", error);
-    }
-  }
+  const product = products.find((item) => String(item.id) === String(id) && item.visible !== false);
   if (!product) {
     document.querySelector("#purchaseProduct").innerHTML = `<section class="page-hero"><h1>商品が見つかりません</h1><a class="primary-link" href="./index.html#all-products">商品一覧へ戻る</a></section>`;
     return;
@@ -382,28 +392,5 @@ async function loadPurchaseProduct() {
   renderPurchaseProduct(product);
 }
 
+setupProductMenuToggle();
 loadPurchaseProduct();
-
-function confirmProductOrder() {
-  const params = new URLSearchParams(window.location.search);
-  const sessionId = params.get("session_id");
-  if (params.get("paid") !== "1" || !sessionId) return;
-  const endpoint = productSheetUrl();
-  const callbackName = `andteteProductOrderConfirm_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
-  const script = document.createElement("script");
-  const separator = endpoint.includes("?") ? "&" : "?";
-  const show = (text) => {
-    const main = document.querySelector("#purchaseProduct");
-    if (main) main.insertAdjacentHTML("afterbegin", `<p class="checkout-note" role="status">${escapeProductHtml(text)}</p>`);
-  };
-  window[callbackName] = (payload) => {
-    script.remove();
-    delete window[callbackName];
-    show(payload?.ok ? "ご注文ありがとうございます。注文内容をメールでお送りしました。" : (payload?.error || "注文情報の保存確認に失敗しました。お問い合わせください。"));
-  };
-  script.onerror = () => window[callbackName]({ ok: false });
-  script.src = `${endpoint}${separator}${new URLSearchParams({ action: "confirmOrder", callback: callbackName, sessionId, _: String(Date.now()) })}`;
-  document.head.appendChild(script);
-}
-
-confirmProductOrder();

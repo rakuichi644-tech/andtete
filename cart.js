@@ -182,6 +182,24 @@ document.addEventListener("click", (event) => {
   }
 });
 
+function setupCartMenuToggle() {
+  document.querySelectorAll(".site-header").forEach((header) => {
+    const button = header.querySelector("[data-menu-toggle]");
+    const nav = header.querySelector(".nav");
+    if (!button || !nav) return;
+    button.addEventListener("click", () => {
+      const open = !header.classList.contains("menu-open");
+      header.classList.toggle("menu-open", open);
+      button.setAttribute("aria-expanded", String(open));
+    });
+    nav.addEventListener("click", (event) => {
+      if (!event.target.closest("a")) return;
+      header.classList.remove("menu-open");
+      button.setAttribute("aria-expanded", "false");
+    });
+  });
+}
+
 document.querySelector("#cartCheckout").addEventListener("click", async () => {
   const button = document.querySelector("#cartCheckout");
   const status = document.querySelector("#cartStatus");
@@ -200,32 +218,8 @@ document.querySelector("#cartCheckout").addEventListener("click", async () => {
   }
 });
 
-function confirmPaidOrder() {
-  const params = new URLSearchParams(window.location.search);
-  const sessionId = params.get("session_id");
-  if (params.get("paid") !== "1" || !sessionId) return Promise.resolve(false);
-  const endpoint = cartEndpoint();
-  const status = document.querySelector("#cartStatus");
-  if (status) status.textContent = "決済完了を確認し、注文情報を保存しています。";
-  return new Promise((resolve) => {
-    const callbackName = `andteteOrderConfirm_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
-    const script = document.createElement("script");
-    const separator = endpoint.includes("?") ? "&" : "?";
-    const finish = (payload) => {
-      script.remove();
-      delete window[callbackName];
-      if (payload?.ok) {
-        removeCart();
-        renderCart();
-        if (status) status.textContent = "ご注文ありがとうございます。注文内容をメールでお送りしました。";
-      } else if (status) status.textContent = payload?.error || "注文情報の保存確認に失敗しました。お問い合わせください。";
-      resolve(Boolean(payload?.ok));
-    };
-    window[callbackName] = finish;
-    script.onerror = () => finish({ ok: false, error: "注文情報の保存確認に失敗しました。" });
-    script.src = `${endpoint}${separator}${new URLSearchParams({ action: "confirmOrder", callback: callbackName, sessionId, _: String(Date.now()) })}`;
-    document.head.appendChild(script);
-  });
+if (new URLSearchParams(window.location.search).get("paid") === "1") {
+  removeCart();
 }
+setupCartMenuToggle();
 renderCart();
-confirmPaidOrder();

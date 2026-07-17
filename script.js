@@ -110,11 +110,12 @@ function writeStoredText(key, value) {
 function addListProductToCart(product, card) {
   const variantSelect = card?.querySelector("[data-variant-select]");
   const selectedVariant = variantSelect?.options[variantSelect.selectedIndex];
-  const variant = selectedVariant?.textContent.trim() || "";
-  const stock = Number(selectedVariant?.dataset.stock || product.stock || 0);
+  const fallbackVariant = productVariants(product)[0];
+  const variant = selectedVariant?.textContent.trim() || fallbackVariant?.name || "";
+  const stock = Number(selectedVariant?.dataset.stock ?? fallbackVariant?.stock ?? product.stock ?? 0);
   if (stock <= 0) return { ok: false, message: "在庫がありません。" };
 
-  const image = optimizeImageUrl(selectedVariant?.dataset.image || card?.querySelector(".product-main-image")?.currentSrc || card?.querySelector(".product-main-image")?.src || productImages(product)[0] || "./assets/hero-handmade.png");
+  const image = optimizeImageUrl(selectedVariant?.dataset.image || fallbackVariant?.image || card?.querySelector(".product-main-image")?.currentSrc || card?.querySelector(".product-main-image")?.src || productImages(product)[0] || "./assets/hero-handmade.png");
   const item = {
     productId: String(product.id || ""),
     name: String(product.name || ""),
@@ -155,56 +156,27 @@ function productCard(product) {
   const firstVariant = variants[0];
   const activeStock = firstVariant ? firstVariant.stock : product.stock;
   const label = product.label || product.categories?.map((category) => categoryLabels[category]).find(Boolean) || "商品";
-  const description = product.description ? `<small>${product.description}</small>` : "";
-  const thumbs = images.length > 1
-    ? `<div class="product-thumbs" aria-label="${escapeHtml(product.name)}の写真">
-        ${images
-          .map(
-            (thumb, index) => `
-              <button class="${index === 0 ? "active" : ""}" type="button" data-product-thumb="${index}" aria-label="写真${index + 1}を表示">
-                <img src="${escapeHtml(thumb)}" alt="" loading="lazy" decoding="async" />
-              </button>
-            `
-          )
-          .join("")}
-      </div>`
-    : "";
-  const variantSelect = variants.length
-    ? `<label class="variant-select-label">カラー
-        <select data-variant-select>
-          ${variants
-            .map(
-              (variant, index) => `
-                <option
-                  value="${index}"
-                  data-stock="${escapeHtml(variant.stock)}"
-                  data-image="${escapeHtml(variant.image || "")}"
-                >${escapeHtml(variant.name)}</option>
-              `
-            )
-            .join("")}
-        </select>
-      </label>`
-    : "";
+  const inStock = Number(activeStock ?? 1) > 0;
+  const productUrl = `./product.html?id=${encodeURIComponent(product.id)}`;
 
   return `
     <article class="product-card" data-product-id="${escapeHtml(product.id)}">
       <div class="product-media">
-        <img class="product-main-image" src="${escapeHtml(firstVariant?.image || image)}" alt="${escapeHtml(product.name)}" loading="lazy" decoding="async" />
+        <a class="product-media-link" href="${productUrl}" aria-label="${escapeHtml(product.name)}の商品ページへ">
+          <img class="product-main-image" src="${escapeHtml(firstVariant?.image || image)}" alt="${escapeHtml(product.name)}" loading="lazy" decoding="async" />
+        </a>
         <span class="badge">${escapeHtml(label)}</span>
+        ${
+          inStock
+            ? `<button class="quick-cart-button product-card-cart" type="button" data-add-card-cart aria-label="${escapeHtml(product.name)}をかごに入れる">${cartIconSvg()}</button>`
+            : `<span class="quick-cart-button product-card-cart disabled-cart" aria-label="在庫なし">${cartIconSvg()}</span>`
+        }
       </div>
-      ${thumbs}
       <div class="product-info">
-        <div class="product-line">
+        <a class="product-line" href="${productUrl}" aria-label="${escapeHtml(product.name)}の商品ページへ">
           <p>${escapeHtml(product.name)}</p>
           <span>${formatPrice(product.price)}</span>
-        </div>
-        ${variantSelect}
-        <div class="stock-line ${Number(activeStock ?? 1) <= 0 ? "soldout" : ""}">${stockText(activeStock)}</div>
-        ${description}
-        <div class="product-actions">
-          <span class="purchase-slot">${purchaseMarkup(product.id, activeStock)}</span>
-        </div>
+        </a>
       </div>
     </article>
   `;
@@ -285,8 +257,15 @@ function renderProducts(products, categories = customerCustomCategories) {
     container.innerHTML = items.length
       ? items.map(productCard).join("")
       : `<p class="empty-message">現在掲載中の商品はありません。</p>`;
+    staggerProductCards(container);
   });
   renderListProducts(activeListCategory);
+}
+
+function staggerProductCards(container) {
+  container.querySelectorAll(".product-card").forEach((card, index) => {
+    card.style.setProperty("--card-index", String(index));
+  });
 }
 
 function renderListProducts(category) {
@@ -298,6 +277,7 @@ function renderListProducts(category) {
   container.innerHTML = items.length
     ? items.map(productCard).join("")
     : `<p class="empty-message">現在掲載中の商品はありません。</p>`;
+  staggerProductCards(container);
   document.querySelectorAll("[data-list-tab]").forEach((button) => {
     const active = button.dataset.listTab === category;
     button.classList.toggle("active", active);
@@ -349,6 +329,24 @@ document.addEventListener("click", (event) => {
 });
 
 document.addEventListener("touchend", handleQuickCartTap, { passive: false });
+
+function setupMenuToggle() {
+  document.querySelectorAll(".site-header").forEach((header) => {
+    const button = header.querySelector("[data-menu-toggle]");
+    const nav = header.querySelector(".nav");
+    if (!button || !nav) return;
+    button.addEventListener("click", () => {
+      const open = !header.classList.contains("menu-open");
+      header.classList.toggle("menu-open", open);
+      button.setAttribute("aria-expanded", String(open));
+    });
+    nav.addEventListener("click", (event) => {
+      if (!event.target.closest("a")) return;
+      header.classList.remove("menu-open");
+      button.setAttribute("aria-expanded", "false");
+    });
+  });
+}
 
 function handleQuickCartTap(event) {
   const quickCart = event.target.closest?.("[data-add-card-cart]");
@@ -493,6 +491,7 @@ async function loadProducts() {
   }
 }
 
+setupMenuToggle();
 loadProducts();
 
 window.addEventListener("storage", (event) => {
