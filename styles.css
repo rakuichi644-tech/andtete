@@ -3238,3 +3238,37 @@ h2 {
     width: 100%;
   }
 }
+
+/* Floating cart and linked gallery fixes */
+.product-card {
+  contain: none;
+  overflow: visible;
+}
+
+.product-media {
+  overflow: visible;
+}
+
+.product-card .product-card-cart {
+  border-radius: 50%;
+  right: -12px;
+  top: -12px;
+  z-index: 5;
+}
+
+.gallery-grid a {
+  display: block;
+  line-height: 0;
+  outline-offset: -3px;
+}
+
+.gallery-grid a:focus-visible {
+  outline: 2px solid rgba(97, 74, 55, 0.75);
+}
+
+@media (max-width: 780px) {
+  .product-card .product-card-cart {
+    right: -10px;
+    top: -10px;
+  }
+}
