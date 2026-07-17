@@ -3272,3 +3272,11 @@ h2 {
     top: -10px;
   }
 }
+
+/* Editorial photo update */
+.photo-band p,
+.photo-band-alt p {
+  bottom: auto;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}

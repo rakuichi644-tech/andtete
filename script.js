@@ -263,6 +263,18 @@ function renderProducts(products, categories = customerCustomCategories) {
   renderListProducts(activeListCategory);
 }
 
+function renderProductLoadingState(message = "商品を読み込み中です。") {
+  allProductsCache = [];
+  renderCustomerCategoryTabs();
+  document.querySelectorAll("[data-products]").forEach((container) => {
+    container.innerHTML = `<p class="empty-message">${escapeHtml(message)}</p>`;
+  });
+  const listContainer = document.querySelector("[data-list-products]");
+  if (listContainer) {
+    listContainer.innerHTML = `<p class="empty-message">${escapeHtml(message)}</p>`;
+  }
+}
+
 function staggerProductCards(container) {
   container.querySelectorAll(".product-card").forEach((card, index) => {
     card.style.setProperty("--card-index", String(index));
@@ -450,46 +462,24 @@ function setupSliders() {
 async function loadProducts() {
   if (!document.querySelector("[data-products]")) return;
 
+  renderProductLoadingState();
   const remoteUrl = sheetDataUrl();
   if (remoteUrl.startsWith("https://script.google.com/")) {
     try {
       const remoteData = await loadRemoteProducts(remoteUrl);
-      if (remoteData.products.length) {
-        renderProducts(remoteData.products, remoteData.categories);
-        setupSliders();
-        return;
-      }
-    } catch (error) {
-      console.warn("スプレッドシートの商品取得に失敗したため、ブラウザ内の商品を表示します。", error);
-    }
-  }
-
-  const previewProducts = localStorage.getItem(productsStorageKey);
-  const previewCategories = normalizeCustomerCategories(JSON.parse(localStorage.getItem(customCategoriesStorageKey) || "[]"));
-  if (previewProducts) {
-    renderProducts(JSON.parse(previewProducts), previewCategories);
-    setupSliders();
-    return;
-  }
-
-  try {
-    const response = await fetch("./data/products.json", { cache: "no-store" });
-    if (!response.ok) throw new Error("商品データを読み込めませんでした。");
-    const products = await response.json();
-    renderProducts(products, previewCategories);
-    setupSliders();
-  } catch (error) {
-    if (Array.isArray(window.ANDTETE_PRODUCTS)) {
-      renderProducts(window.ANDTETE_PRODUCTS, previewCategories);
+      renderProducts(remoteData.products, remoteData.categories);
       setupSliders();
       return;
+    } catch (error) {
+      renderProductLoadingState("商品データを読み込めませんでした。少し時間を置いて再読み込みしてください。");
+      setupSliders();
+      console.warn("スプレッドシートの商品取得に失敗しました。", error);
+      return;
     }
-
-    document.querySelectorAll("[data-products]").forEach((container) => {
-      container.innerHTML = `<p class="empty-message">商品データの読み込みに失敗しました。</p>`;
-    });
-    console.error(error);
   }
+
+  renderProductLoadingState("商品データの連携を確認中です。");
+  setupSliders();
 }
 
 setupMenuToggle();
@@ -505,23 +495,8 @@ window.addEventListener("storage", (event) => {
     }
     return;
   }
-  if (event.key !== productsStorageKey || !event.newValue) return;
-  try {
-    const categories = JSON.parse(localStorage.getItem(customCategoriesStorageKey) || "[]");
-    renderProducts(JSON.parse(event.newValue), categories);
-  } catch (error) {
-    console.warn("更新された商品データを読み込めませんでした。", error);
-  }
-});
-
-window.addEventListener("focus", () => {
-  const previewProducts = localStorage.getItem(productsStorageKey);
-  if (!previewProducts) return;
-  try {
-    const categories = JSON.parse(localStorage.getItem(customCategoriesStorageKey) || "[]");
-    renderProducts(JSON.parse(previewProducts), categories);
-  } catch (error) {
-    console.warn("商品データを再読み込みできませんでした。", error);
+  if (event.key === productsStorageKey) {
+    loadProducts();
   }
 });
 
