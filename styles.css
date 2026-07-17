@@ -1015,6 +1015,12 @@ h3 {
   padding: 4vw 5vw 6vw;
 }
 
+.easy-admin h1 {
+  font-size: clamp(2.4rem, 7vw, 5.2rem);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
 .admin-lead {
   color: var(--muted);
   max-width: 52rem;
@@ -1035,6 +1041,10 @@ h3 {
   display: flex;
   gap: 0.8rem;
   padding: 1rem;
+}
+
+.easy-steps span {
+  white-space: nowrap;
 }
 
 .easy-steps strong {
@@ -2018,6 +2028,14 @@ h3 {
   .easy-product-card,
   .image-uploader {
     grid-template-columns: 1fr;
+  }
+
+  .easy-admin h1 {
+    font-size: clamp(2rem, 11vw, 2.7rem);
+  }
+
+  .easy-steps div {
+    padding: 0.78rem 0.9rem;
   }
 
   .variant-row {

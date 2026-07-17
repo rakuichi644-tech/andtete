@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>かんたん商品管理 | andtete</title>
+    <title>簡単商品管理 | andtete</title>
     <meta name="robots" content="noindex" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -11,15 +11,15 @@
       href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Noto+Sans+JP:wght@400;500;700&family=Noto+Serif+JP:wght@400;500;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./styles.css?v=20260717-07" />
+    <link rel="stylesheet" href="./styles.css?v=20260717-08" />
   </head>
   <body class="admin-body">
     <main class="admin-shell easy-admin">
       <span class="eyebrow">easy product manager</span>
-      <h1>かんたん商品管理</h1>
+      <h1>簡単商品管理</h1>
       <p class="admin-lead">
-        商品名、価格、写真、掲載場所を入力して「保存」するだけです。
-        保存後はこのブラウザでトップページの見え方を確認できます。
+        商品名、価格、写真、掲載場所を入力して保存するだけです。
+        保存後はスプレッドシートとHPへ自動反映します。
       </p>
 
       <section class="easy-steps" aria-label="使い方">
@@ -29,11 +29,11 @@
         </div>
         <div>
           <strong>2</strong>
-          <span>保存して確認</span>
+          <span>保存する</span>
         </div>
         <div>
           <strong>3</strong>
-          <span>公開用ファイルを作成</span>
+          <span>HPへ自動反映</span>
         </div>
       </section>
 
@@ -78,7 +78,15 @@
             </div>
           </label>
           <label>表示ラベル
-            <input id="label" placeholder="例: NEW / 予約 / おすすめ" />
+            <select id="label">
+              <option value="">ラベルなし</option>
+              <option value="NEW">NEW</option>
+              <option value="おすすめ">おすすめ</option>
+              <option value="予約">予約</option>
+              <option value="即納">即納</option>
+              <option value="再入荷">再入荷</option>
+              <option value="人気">人気</option>
+            </select>
           </label>
           <label class="span-2">商品説明
             <textarea id="description" placeholder="商品の特徴やお知らせを書きます"></textarea>
@@ -138,7 +146,6 @@
           </div>
           <div class="easy-actions">
             <a class="primary-link" href="./index.html" target="_blank" rel="noreferrer">HPで確認</a>
-            <button class="primary-link" type="button" id="exportProducts">公開用ファイルを作る</button>
             <button class="primary-link soft-button" type="button" id="resetProducts">初期データに戻す</button>
           </div>
         </div>
@@ -150,24 +157,12 @@
         <nav class="admin-pagination" id="adminPagination" aria-label="登録商品のページ切り替え"></nav>
       </section>
 
-      <section class="admin-panel publish-panel" aria-labelledby="publish-title">
-        <span class="eyebrow">publish</span>
-        <h2 id="publish-title">公開するとき</h2>
-        <p>
-          「公開用ファイルを作る」を押すと、商品データが作られます。
-          ダウンロードされたファイルを公開サイト側に反映すれば、お客様にも見える商品一覧になります。
-        </p>
-        <label class="admin-output">公開用データ
-          <textarea id="jsonOutput" readonly placeholder="公開用ファイルを作ると、ここに内容が表示されます。"></textarea>
-        </label>
-      </section>
-
       <section class="admin-panel sheet-panel" aria-labelledby="sheet-title">
         <span class="eyebrow">Google Sheets</span>
-        <h2 id="sheet-title">スプシ・HPへ自動反映</h2>
+        <h2 id="sheet-title">自動反映の設定</h2>
         <p>
-          Google Apps ScriptのURLを一度入れると、商品を保存・変更・削除するたびに自動送信します。
-          HPも最新の商品、在庫、カラー、オプション、画像を自動取得します。
+          最初に一度だけ設定します。設定後は商品を保存・変更・削除するたびに、
+          スプレッドシートとHPへ自動反映します。
         </p>
         <ol class="sync-steps">
           <li>Googleスプレッドシートを1つ作る</li>
@@ -191,6 +186,6 @@
 
     <script src="./site-config.js"></script>
     <script src="./data/products.js"></script>
-    <script src="./admin.js?v=20260717-07"></script>
+    <script src="./admin.js?v=20260717-08"></script>
   </body>
 </html>
